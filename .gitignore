@@ -1,0 +1,12 @@
+# GnuPG test home - contains sensitive/local key state
+gnupg-test/
+
+# Dependencies
+**/node_modules/
+
+# Upstream/source dependencies
+oracle_javacard_sdks/
+neopgp/
+
+# macOS
+.DS_Store

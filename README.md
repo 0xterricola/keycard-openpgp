@@ -110,7 +110,7 @@ terricola-testtt
 
 Hardware-backed signing works and verifies successfully with GnuPG.
 
-## Thurin Compatibility
+## Thurin Integration
 
 `@thurinlabs/identity-kit` successfully parses the certificate:
 
@@ -148,6 +148,53 @@ With that policy enabled in Thurin's `verifyAttestation()`, the complete hardwar
 ```
 
 The tested attestation binds the OpenPGP key to the Ethereum address derived from the same public point.
+
+### Mathom and the air-gap workflow
+
+Mathom is also relevant to the next stage of this project.
+
+Mathom explores an air-gapped OpenPGP architecture where cryptographic requests cross a QR boundary to an offline signer rather than requiring the private-key environment to remain directly connected to the host.
+
+That makes it useful reference work for several problems this project now needs to solve:
+
+- preparing an OpenPGP operation on the host
+- moving the request across an air gap
+- executing the sensitive operation on the offline side
+- returning the result to the host
+- preserving enough state for an asynchronous workflow
+
+The goal is not necessarily to reuse Mathom's QR encoding directly.
+
+Keycard Shell already has animated QR support, including BC-UR / ERC-4527. Mathom can instead inform the OpenPGP application layer and the host/offline-signer boundary, while Shell provides the eventual trusted hardware interface and QR transport.
+
+Conceptually:
+
+```text
+GnuPG / Thurin / host application
+              ↓
+     asynchronous request
+              ↓
+        QR transport
+              ↓
+
+           AIR GAP
+
+              ↓
+     trusted signing device
+              ↓
+    human-readable intent
+              ↓
+     physical authorization
+              ↓
+       NeoPGP JavaCard
+              ↓
+       signed response
+              ↓
+        QR back to host
+```
+
+The work in this repository is focused particularly on the layer between those pieces: defining structured signing intent, rendering that intent on a trusted display, and ensuring the data shown to the human is cryptographically tied to what the JavaCard actually signs.
+
 
 ## Embedded Linux Reference Prototype
 
@@ -390,7 +437,7 @@ NeoPGP signature
 host verifies / consumes result
 ```
 
-BC-UR / ERC-4527 are candidates for the QR transport layer rather than inventing a new framing protocol.
+Mathom provides useful reference work for the asynchronous OpenPGP request/response model, while Keycard Shell's existing BC-UR / ERC-4527 support is a natural candidate for the transport layer rather than inventing a new framing protocol.
 
 The remaining GPG integration problem is making the host-side workflow asynchronous: the signing request leaves the host, is approved and signed elsewhere, and the response returns later.
 

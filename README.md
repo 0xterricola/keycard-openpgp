@@ -515,3 +515,7 @@ Do not use this prototype for meaningful funds, production identities, or sensit
 Using one private key across OpenPGP and Ethereum collapses security domains. A production design needs strict protocol separation, trusted display, and explicit physical authorization.
 
 No private keys, PINs, local GnuPG state, firmware signing keys, or other sensitive development credentials should be committed to this repository.
+
+## Documentation
+
+- [End-to-End QR Signing Prototype](docs/END_TO_END_QR_SIGNING.md) — optical signing requests, trusted display review, physical approve/reject gating, NeoPGP hardware signing, and QR responses.

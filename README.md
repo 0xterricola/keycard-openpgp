@@ -125,27 +125,24 @@ algorithm:
 secp256k1
 ```
 
-Two OpenPGP.js compatibility details were found.
+Two OpenPGP.js compatibility details were found, and both are now handled inside identity-kit
+(1.0.2 and later):
 
-`eckey-utils` is required at runtime for secp256k1 self-certification verification:
+- OpenPGP.js rejects secp256k1 by default (`rejectCurves`), because RFC 9580 does not list the
+  curve. identity-kit clears that rejection on every verification path, so no `config` is needed
+  by callers.
+- In Node, OpenPGP.js needs `eckey-utils` for this curve. identity-kit declares it as a
+  dependency, so `npm install` brings it in. The browser build needs nothing extra.
 
-```bash
-npm install eckey-utils
-```
-
-OpenPGP.js rejects secp256k1 message verification by default. Verification succeeds with:
-
-```ts
-config: {
-  rejectCurves: new Set(),
-}
-```
-
-With that policy enabled in Thurin's `verifyAttestation()`, the complete hardware-signed attestation returns:
+With `@thurinlabs/identity-kit@^1.0.2`, `verifyAttestation()` returns for the complete
+hardware-signed attestation, unmodified:
 
 ```text
 { verified: true }
 ```
+
+The attestation in `experiments/thurin/` is also the secp256k1 test fixture in identity-kit's own
+test suite, so this key type stays covered there.
 
 The tested attestation binds the OpenPGP key to the Ethereum address derived from the same public point.
 

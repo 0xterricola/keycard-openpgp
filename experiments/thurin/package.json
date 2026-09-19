@@ -10,7 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@thurinlabs/identity-kit": "^1.0.1",
+    "@thurinlabs/identity-kit": "^1.0.2",
     "eckey-utils": "^0.7.14",
     "openpgp": "^6.3.1",
     "tsx": "^4.23.13",

@@ -182,18 +182,20 @@ Keycard Shell is the eventual target hardware.
 
 ### Keypad / local PIN
 
-- 🟡 12-button matrix driver loads
-- 🟡 R4 / PE10 physically responds
-- ⚠️ REJECT / `0` / APPROVE currently report together
-- ⚠️ R1 / R2 / R3 are not producing expected interrupts
-- ⏳ Finish continuity / electrical debugging
-- ⏳ Reliable `0–9` input
-- ⏳ Individually reliable APPROVE button
-- ⏳ Individually reliable REJECT button
-- ⏳ Local PIN entry
-- ⏳ PIN buffer wiping
-- ⏳ One-attempt VERIFY / fail-closed behavior
-- ⏳ Remove terminal PIN dependency
+- ✅ Full 12-button matrix is electrically and logically correct
+- ✅ Reliable `0–9` input
+- ✅ Individually reliable APPROVE button
+- ✅ Individually reliable REJECT button
+- ✅ R1 moved from non-working PD30 path to PA16
+- ✅ Local NeoPGP PIN entry through the physical keypad
+- ✅ Masked PIN progress shown on the trusted display
+- ✅ PIN digits are not echoed or logged
+- ✅ PIN buffers are wiped on cancel/failure and after VERIFY use
+- ✅ PIN-stage REJECT fails closed without signing
+- ✅ One VERIFY attempt per signing attempt; failure exits closed
+- ✅ Terminal PIN dependency removed
+- ✅ Successful keypad PIN signing demonstrated with counter `10 → 11`
+- ✅ PIN-stage cancellation demonstrated with counter `11 → 11`
 
 ### Final hardware hardening
 
@@ -204,9 +206,11 @@ Keycard Shell is the eventual target hardware.
 
 ### Temporary development mode
 
-Terminal PIN entry can remain temporarily while the OpenPGP and middleware layers are developed.
+The working SAMA signer no longer depends on the SSH terminal for PIN entry.
 
-Local PIN entry and removal of networking are required before claiming the final signer is air-gapped.
+SSH is still being used as a development and control channel to launch and debug the signer.
+
+Booting directly into the signer and physically removing networking are still required before claiming the final device is fully air-gapped.
 
 ---
 
@@ -270,18 +274,24 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 
 ### Today / current development session
 
-- 🟡 Continue keypad hardware debugging
-- 🟡 Improve hardware-side progress toward local PIN input
-- ✅ Document the broader project roadmap and current status
+- ✅ Completed keypad electrical and matrix debugging
+- ✅ All 12 physical keypad buttons working under Linux
+- ✅ Replaced the non-working R1 / PD30 path with PA16
+- ✅ Implemented local NeoPGP PIN entry
+- ✅ Added masked PIN progress to the trusted display
+- ✅ Verified PIN-stage cancellation fails closed
+- ✅ Removed the terminal PIN dependency
+- ✅ Copied the working SAMA signer sources into the repository under `embedded/sama5d3/`
+- ✅ Documented the broader project roadmap and current status
 - ✅ Updated Thurin experiment to current `identity-kit` 1.1.1
-- 🟡 Track Ben's external EIP-712 signer-hook work
+- ✅ Verified Thurin 0.7.0 external EIP-712 signer / sign-out integration path
 - 🟡 Track the OpenPGP artifact work needed for the next interoperability milestone
 - 🔬 Keep Mathom / Keycard Shell transport research queued as the middleware layer becomes more concrete
 
 ### Next major milestones
 
-1. ⏳ Get all 12 keypad buttons electrically and logically correct
-2. ⏳ Implement local PIN entry
+1. ✅ Get all 12 keypad buttons electrically and logically correct
+2. ✅ Implement trusted local PIN entry with masked on-device feedback
 3. ⏳ Produce a standards-compliant OpenPGP signed artifact from the hardware signature
 4. ⏳ Make `identity-kit` verify that artifact successfully
 5. ⏳ Define / adopt the generic QR signing middleware
@@ -299,6 +309,12 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - ✅ Trusted display operational
 - ✅ Camera-driven QR request works
 - ✅ Physical APPROVE / REJECT decision affects signing
+- ✅ Full 3×4 physical keypad operational under Linux
+- ✅ Local NeoPGP PIN entry works through the trusted keypad
+- ✅ PIN progress is masked on the trusted display
+- ✅ PIN-stage cancellation fails closed with signature counter unchanged (`11 → 11`)
+- ✅ Successful local-PIN signing increments the signature counter (`10 → 11`)
+- ✅ Terminal PIN entry dependency removed
 - ✅ Signature counter proves reject does not sign and approve does
 - ✅ Raw signature returned via QR
 - ✅ Thurin's PGP and Ethereum signing boundaries understood

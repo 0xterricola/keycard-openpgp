@@ -1,47 +1,59 @@
 # keycard-openpgp
 
-Experimental OpenPGP work on programmable JavaCards, targeting Keycard Shell as an air-gapped hardware interface.
+Experimental trusted signing architecture using removable hardware keys, disconnected transport, and human-verifiable authorization, with OpenPGP as the first protocol adapter and Keycard Shell as the target portable interface.
 
-## Thesis
+## Project Goal
 
-Can a removable JavaCard hold a hardware-backed OpenPGP identity while the same `secp256k1` public key also deterministically defines an Ethereum address?
+`keycard-openpgp` is an experimental trusted signing architecture built around a removable hardware key and a disconnected human-verification device.
 
-Longer-term:
+The goal is not merely to make a JavaCard sign hashes. An application should hand over structured intent to a trusted device that independently validates and renders what is being authorized, requires physical approval and local PIN entry, binds that intent to the exact bytes or digest being signed, and returns a standard cryptographic artifact.
 
-```text
-GnuPG / Thurin CLI
-        ↓
-structured signing intent
-        ↓
-animated QR
-        ↓
-Keycard Shell
-display + keypad + camera
-        ↓
-ISO-7816
-        ↓
-JavaCard / NeoPGP
-        ↓
-non-exportable private key
-```
+OpenPGP is the first protocol adapter. Thurin is the first external application integration. The SAMA5D3 is the reference prototype. Keycard Shell is the intended portable target.
 
-The broader goal is to explore Keycard Shell as a general-purpose air-gapped cryptographic interface, with OpenPGP as the first non-wallet protocol.
+## Initial Research Question
 
-The important UX and security question is not merely how to sign a hash, but how the trusted device can show the human what they are actually authorizing before the signature occurs.
+The project began by asking whether one JavaCard-held `secp256k1` key could back an OpenPGP identity while the same public point also defines an Ethereum address.
 
-## Current Status
+That experiment succeeded, but shared-key use across protocols is not a requirement of the general architecture. A production design may intentionally separate keys and security domains.
 
-The core cryptographic proof-of-concept now works end-to-end on both a desktop host and an embedded Linux reference platform.
+## Current Prototype Status
+
+The SAMA5D3 reference prototype now demonstrates the trusted interaction loop around the NeoPGP hardware signing primitive.
+
+### Proven on the SAMA5D3
+
+- ✅ camera-driven QR request input
+- ✅ prototype `KC1` request parsing
+- ✅ trusted display of signing intent
+- ✅ independent physical APPROVE / REJECT controls
+- ✅ full 3×4 numeric keypad
+- ✅ local NeoPGP PIN entry
+- ✅ masked PIN feedback on the trusted display
+- ✅ request rejection causes no signing operation
+- ✅ PIN-stage cancellation causes no signing operation
+- ✅ NeoPGP secp256k1 private-key operation
+- ✅ raw 64-byte `r || s` ECDSA signature
+- ✅ QR signature response
+- ✅ disconnected QR request → hardware signing → QR response loop
+
+### Still in progress
+
+- ⏳ standards-compliant OpenPGP artifact from the embedded signer
+- ⏳ hardware-produced OpenPGP artifact verified by `identity-kit`
+- ⏳ Keycard-backed EIP-712 / 65-byte recoverable Ethereum signing
+- ⏳ generic replay-safe request/response middleware
+- ⏳ network-free boot/runtime
+- ⏳ Keycard Shell port
 
 ### Hardware
 
 - HID Global OMNIKEY 3x21 reader
-- NXP JavaCard originally used in the PhononDAO alpha
-- GlobalPlatform 2.1.1 / SCP02
-- JavaCard 3.0.4 compatible
-- Original Phonon applet removed
+- NXP programmable JavaCard originally used in the PhononDAO alpha
 - NeoPGP installed
-- Microchip SAMA5D3 Xplained embedded Linux reference platform
+- Microchip SAMA5D3 Xplained
+- ST7789 trusted display
+- USB camera
+- 3×4 physical keypad
 
 The current JavaCard is a programmable research card. It is not a retail Keycard.
 
@@ -110,90 +122,65 @@ terricola-testtt
 
 Hardware-backed signing works and verifies successfully with GnuPG.
 
+That connected GnuPG path produces normal OpenPGP signatures through the smart-card stack.
+
+The current SAMA5D3 direct-signing prototype operates at a lower layer: it currently signs `SHA-256(message)` with the NeoPGP ECDSA key and receives the raw 64-byte `r || s` result.
+
+Turning that proven raw hardware primitive into a standards-compliant OpenPGP signature packet and clearsigned or detached artifact is the next protocol milestone.
+
 ## Thurin Integration
 
-`@thurinlabs/identity-kit` successfully parses the certificate:
+Thurin is the first serious external application integration for the architecture.
 
-```text
-fingerprint:
-31CE69D66A5E9DE0F977B59C79BB391497E8E6D4
+`@thurinlabs/identity-kit` 1.1.1 successfully parses and verifies the existing hardware-backed `secp256k1` OpenPGP fixture.
 
-userIDs:
-terricola-testtt
-
-algorithm:
-secp256k1
-```
-
-Two OpenPGP.js compatibility details were found, and both are now handled inside identity-kit
-(1.0.2 and later):
-
-- OpenPGP.js rejects secp256k1 by default (`rejectCurves`), because RFC 9580 does not list the
-  curve. identity-kit clears that rejection on every verification path, so no `config` is needed
-  by callers.
-- In Node, OpenPGP.js needs `eckey-utils` for this curve. identity-kit declares it as a
-  dependency, so `npm install` brings it in; `experiments/thurin/package.json` depends only on
-  identity-kit and openpgp. The browser build needs nothing extra. (The `test-openpgp.ts` and
-  `test-message-verify.ts` scripts call OpenPGP.js directly and rely on the same hoisted copy.)
-
-With `@thurinlabs/identity-kit@^1.0.2`, `verifyAttestation()` returns for the complete
-hardware-signed attestation, unmodified:
+The existing OpenPGP regression tests pass on 1.1.1, and the hardware-backed attestation fixture returns:
 
 ```text
 { verified: true }
 ```
 
-The attestation in `experiments/thurin/` is also the secp256k1 test fixture in identity-kit's own
-test suite, so this key type stays covered there.
+The canonical Thurin attestation statement is:
 
-The tested attestation binds the OpenPGP key to the Ethereum address derived from the same public point.
+```text
+I control the Ethereum address: 0x…
+```
+
+The existing fixture demonstrates that the OpenPGP key can attest to the Ethereum address derived from the same public point.
+
+### Thurin 0.7.0 external signer interface
+
+Thurin 0.7.0 exposes the EIP-712 authorization seam needed for a hardware signer.
+
+Its external signer interface sends EIP-712 typed data as JSON to the signer and expects a 65-byte recoverable Ethereum signature in response.
+
+Thurin also supports a disconnected signing handoff:
+
+```text
+Thurin --sign-out
+        ↓
+typed-data handoff
+        ↓
+offline / external signer
+        ↓
+65-byte signature
+        ↓
+Thurin authorize finish
+```
+
+The `authorize finish` path performs signer recovery, checks the current registry nonce, and simulates the matching authorization call before continuing.
+
+The real Keycard-backed EIP-712 signature has not yet been produced.
 
 ### Mathom and the air-gap workflow
 
-Mathom is also relevant to the next stage of this project.
+Mathom is reference work for studying the host → offline signer → response boundary.
 
-Mathom explores an air-gapped OpenPGP architecture where cryptographic requests cross a QR boundary to an offline signer rather than requiring the private-key environment to remain directly connected to the host.
+The project does not currently claim asynchronous middleware semantics and does not assume Mathom's QR encoding will be reused directly.
 
-That makes it useful reference work for several problems this project now needs to solve:
+Keycard Shell already provides useful QR primitives, while BC-UR and multipart transport remain candidates for the eventual transport layer.
 
-- preparing an OpenPGP operation on the host
-- moving the request across an air gap
-- executing the sensitive operation on the offline side
-- returning the result to the host
-- preserving enough state for an asynchronous workflow
-
-The goal is not necessarily to reuse Mathom's QR encoding directly.
-
-Keycard Shell already has animated QR support, including BC-UR / ERC-4527. Mathom can instead inform the OpenPGP application layer and the host/offline-signer boundary, while Shell provides the eventual trusted hardware interface and QR transport.
-
-Conceptually:
-
-```text
-GnuPG / Thurin / host application
-              ↓
-     asynchronous request
-              ↓
-        QR transport
-              ↓
-
-           AIR GAP
-
-              ↓
-     trusted signing device
-              ↓
-    human-readable intent
-              ↓
-     physical authorization
-              ↓
-       NeoPGP JavaCard
-              ↓
-       signed response
-              ↓
-        QR back to host
-```
-
-The work in this repository is focused particularly on the layer between those pieces: defining structured signing intent, rendering that intent on a trusted display, and ensuring the data shown to the human is cryptographically tied to what the JavaCard actually signs.
-
+The current proven prototype instead uses the simpler `KC1` request/response format.
 
 ## Embedded Linux Reference Prototype
 
@@ -322,6 +309,50 @@ independent host verification
 
 The private key never leaves the JavaCard.
 
+
+### Trusted interaction prototype
+
+The SAMA5D3 reference platform now also proves the human-authorization path around the hardware private-key operation.
+
+```text
+QR signing request
+        ↓
+camera
+        ↓
+request parsing
+        ↓
+trusted display
+        ↓
+physical APPROVE / REJECT
+        ↓
+local masked PIN entry
+        ↓
+NeoPGP VERIFY
+        ↓
+hardware ECDSA operation
+        ↓
+QR signing response
+```
+
+The 3×4 keypad provides:
+
+```text
+1 2 3
+4 5 6
+7 8 9
+REJECT 0 APPROVE
+```
+
+Request-level rejection has been demonstrated with the NeoPGP signature counter unchanged.
+
+PIN-stage cancellation has also been demonstrated with the counter unchanged (`11 → 11`).
+
+A successful local-PIN signing operation incremented the counter (`10 → 11`).
+
+PIN digits are never echoed to the terminal and are represented only by masked progress on the trusted display.
+
+SSH is still used to launch and debug the prototype, so the current SAMA5D3 system is not yet claimed as a final physically air-gapped device.
+
 ## Keycard Shell
 
 Keycard Shell remains the target hardware interface.
@@ -348,75 +379,61 @@ The embedded Linux board is therefore being used as a reference platform for dev
 
 ## Human-Readable Signing Intent
 
-The next problem is not simply making another device sign arbitrary hashes.
+Human-readable intent is a core security property of the architecture.
 
-The goal is for the trusted device to understand enough about the operation to show the human what is actually being authorized.
+The trusted device must independently understand enough about the requested operation to render what the human is actually authorizing.
 
-For example:
+The central rule is:
 
-```text
-PGP ↔ Ethereum Binding
+> The human-readable display must be cryptographically bound to the exact bytes or digest that is ultimately authorized for signing.
 
-PGP fingerprint:
-31CE69D6...97E8E6D4
+The online host must not be able to provide friendly display text while separately supplying an unrelated opaque digest for the hardware key to sign.
 
-Ethereum address:
-0x9cE2E20F...13B5f3fF
+If the trusted device cannot independently validate the relationship between displayed intent and signed material, it must reject the request.
 
-Statement:
-I control this Ethereum address
-
-Reject              Approve
-```
-
-The important security property is:
-
-> The human-readable display must be derived from the same structured data that is ultimately signed.
-
-The host should not be able to provide friendly display text that is unrelated to an opaque hash being authorized.
-
-A future request could therefore describe a typed operation such as:
+The trusted side therefore owns the security-critical path:
 
 ```text
-operation:
-  pgp_eth_binding
-
-pgp_fingerprint:
-  31CE69D66A5E9DE0F977B59C79BB391497E8E6D4
-
-ethereum_address:
-  0x9cE2E20FC392304fD1e50541eC67168913B5f3fF
-
-statement:
-  I control Ethereum address
-  0x9cE2E20FC392304fD1e50541eC67168913B5f3fF
+structured request
+        ↓
+parse + validate
+        ↓
+trusted rendering
+        ↓
+physical approval
+        ↓
+protocol-specific trusted encoding
+        ↓
+exact signed bytes / digest
+        ↓
+hardware key
 ```
 
-The trusted device can validate that structure, render it itself, require physical approval, and only then ask the JavaCard to sign.
-
-Potential future intent types include:
+Potential protocol adapters include:
 
 ```text
 pgp_cleartext_sign
 pgp_certify_key
 pgp_eth_binding
+eip712_sign
+ethereum_transaction
+ssh_sign
+nostr_sign
 git_commit_sign
 file_sign
 ```
 
-## Asynchronous Air-Gapped Flow
+## Disconnected Air-Gapped Signing Flow
 
-Animated QR is intended to replace the permanently connected smart-card assumption.
-
-Conceptually:
+The current reference prototype demonstrates a disconnected, sequential request/response signing flow:
 
 ```text
 host prepares structured request
              ↓
-       animated QR
+          QR request
              ↓
 
-          AIR GAP
+           AIR GAP
 
              ↓
 trusted device parses request
@@ -425,85 +442,108 @@ human-readable display
              ↓
 physical approval
              ↓
-NeoPGP signature
+local PIN
              ↓
-       response QR
+hardware signature
+             ↓
+         response QR
              ↓
 
-          AIR GAP
+           AIR GAP
 
              ↓
 host verifies / consumes result
 ```
 
-Mathom provides useful reference work for the asynchronous OpenPGP request/response model, while Keycard Shell's existing BC-UR / ERC-4527 support is a natural candidate for the transport layer rather than inventing a new framing protocol.
+This disconnected QR signing loop is proven.
 
-The remaining GPG integration problem is making the host-side workflow asynchronous: the signing request leaves the host, is approved and signed elsewhere, and the response returns later.
+A generalized asynchronous middleware system is not yet implemented.
+
+Persistent pending requests, multiple outstanding operations, request correlation, retries, multipart transport, and replay protection remain future middleware work.
+
+Mathom remains useful reference work for the host/offline-signer boundary, while Keycard Shell QR support and BC-UR remain candidates for the eventual transport layer.
 
 ## Proven
 
-- NeoPGP runs on the JavaCard
-- secp256k1 key generation works on-card
-- the private key remains on-card
-- GnuPG recognizes the card as OpenPGP 3.4
-- GnuPG can build an OpenPGP identity around the card key
-- hardware OpenPGP signing works
-- the same public point derives an Ethereum address
-- Thurin identity-kit parses the resulting PGP certificate
-- the card can PGP-sign its derived Ethereum address
-- Thurin can verify that attestation with secp256k1 verification enabled
-- SAMA5D3 Buildroot detects the OMNIKEY reader through PC/SC
-- embedded Linux can select the NeoPGP applet
-- embedded Linux can read the correct signing-key fingerprint
-- embedded Linux confirms ECDSA / secp256k1 signing attributes
-- embedded Linux can request a real hardware signature
-- the resulting signature independently verifies against the known public key
-- experimental Keycard Shell NeoPGP detection firmware builds successfully
+- ✅ NeoPGP runs on the JavaCard
+- ✅ `secp256k1` key generation works on-card
+- ✅ private key remains on-card
+- ✅ GnuPG recognizes the card as OpenPGP 3.4
+- ✅ connected GnuPG hardware OpenPGP signing works
+- ✅ the same public point derives an Ethereum address
+- ✅ Thurin `identity-kit` verifies the existing hardware-backed OpenPGP fixture
+- ✅ SAMA5D3 detects the OMNIKEY reader through PC/SC
+- ✅ embedded Linux selects the NeoPGP applet
+- ✅ embedded Linux reads the correct signing-key fingerprint
+- ✅ embedded Linux performs a real hardware private-key operation
+- ✅ raw embedded ECDSA signatures verify against the known public key
+- ✅ trusted signing-intent display works
+- ✅ full 3×4 physical keypad works
+- ✅ physical APPROVE / REJECT controls work
+- ✅ local NeoPGP PIN entry works
+- ✅ masked PIN progress works on the trusted display
+- ✅ request rejection performs no signing operation
+- ✅ PIN-stage cancellation performs no signing operation
+- ✅ QR request input works
+- ✅ QR signature response works
+- ✅ disconnected QR request → hardware signing → QR response loop works
+- ✅ experimental Keycard Shell NeoPGP detection firmware builds
+- ✅ Thurin 0.7.0 external EIP-712 signer interface is understood
 
 ## Not Yet Proven
 
-- custom NeoPGP firmware running on retail Keycard Shell
-- OpenPGP signing through Shell itself
-- trusted-display approval
-- physical approve / reject controls
-- structured signing-intent format
-- OpenPGP animated QR request/response
-- GnuPG asynchronous virtual-card bridge
-- Thurin CLI hardware-signer integration
-- production backup/recovery
-- safe production use of one key across PGP and Ethereum
+- ⏳ standards-compliant OpenPGP artifact from the embedded direct-signing path
+- ⏳ embedded hardware OpenPGP artifact verified by `identity-kit`
+- ⏳ 65-byte recoverable Ethereum signature produced by the Keycard
+- ⏳ real Thurin `--sign-out` → hardware signer → `authorize finish` flow
+- ⏳ hardware-authorized Thurin attestation on Sepolia
+- ⏳ generic replay-safe signing middleware
+- ⏳ request IDs and response correlation
+- ⏳ BC-UR / multipart transport
+- ⏳ boot directly into the signer without SSH
+- ⏳ physically network-disconnected runtime demonstration
+- ⏳ NeoPGP signing through Keycard Shell
+- ⏳ production backup / recovery design
+- ⏳ production policy for cross-protocol key use
 
-## Next Milestone: Trusted Display + Physical Approval
+## Next Milestone: Standards-Compliant OpenPGP Artifact
 
-The cryptographic path on the embedded Linux reference platform is working.
+The trusted hardware interaction loop is working.
 
-The next target is:
+The next protocol milestone is to turn the proven raw NeoPGP ECDSA primitive into a standards-compliant OpenPGP signed artifact.
+
+Target flow:
 
 ```text
 structured signing request
         ↓
-embedded Linux device
+trusted device validates + renders intent
         ↓
-display human-readable intent
+physical approval + local PIN
         ↓
-physical approve / reject
+construct correct OpenPGP signature digest
         ↓
-NeoPGP JavaCard
+NeoPGP ECDSA private-key operation
         ↓
-hardware signature
+build OpenPGP ECDSA signature packet
+        ↓
+build clearsigned / detached artifact
+        ↓
+identity-kit verification
 ```
 
 After that:
 
-1. add QR request decoding
-2. add QR signature response
-3. make the host workflow asynchronous
-4. complete an air-gapped PGP ↔ Ethereum identity-binding demo
-5. port the proven interaction model onto Keycard Shell
+1. verify the hardware-produced OpenPGP artifact with `identity-kit`,
+2. implement the Keycard-backed EIP-712 adapter,
+3. complete a real Thurin `--sign-out` → hardware signer → `authorize finish` flow,
+4. define the reusable replay-safe QR middleware,
+5. remove SSH / Ethernet and demonstrate the network-free reference flow,
+6. port the proven interaction model onto Keycard Shell.
 
-The larger research question remains:
+The larger research question is:
 
-> What should OpenPGP hardware interaction look like if designed around secure elements, trusted displays, structured intent, and asynchronous air-gapped QR transport instead of assuming a permanently connected smart-card reader?
+> What should a general-purpose hardware signing interface look like when applications provide structured intent, the trusted device independently validates and renders what is being authorized, and a removable hardware key performs the private-key operation across a disconnected transport?
 
 ## Security
 
@@ -516,5 +556,7 @@ Using one private key across OpenPGP and Ethereum collapses security domains. A 
 No private keys, PINs, local GnuPG state, firmware signing keys, or other sensitive development credentials should be committed to this repository.
 
 ## Documentation
+
+- [Roadmap & Project Status](docs/ROADMAP_STATUS.md)
 
 - [End-to-End QR Signing Prototype](docs/END_TO_END_QR_SIGNING.md) — optical signing requests, trusted display review, physical approve/reject gating, NeoPGP hardware signing, and QR responses.

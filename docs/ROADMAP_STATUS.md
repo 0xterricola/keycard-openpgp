@@ -21,6 +21,9 @@ Thurin is the first serious external application integration and gives the proje
 ### Current status
 
 - ✅ `@thurinlabs/identity-kit` supports secp256k1 PGP verification
+- ✅ Thurin experiment updated to `identity-kit` 1.1.1
+- ✅ All five existing Thurin/OpenPGP regression scripts pass on 1.1.1
+- ✅ Hardware-signed attestation fixture still returns `{ verified: true }`
 - ✅ React-free `/core` interface available
 - ✅ Canonical attestation statement identified:
   - `I control the Ethereum address: 0x…`
@@ -31,7 +34,7 @@ Thurin is the first serious external application integration and gives the proje
 - ✅ `--authorize` EIP-712 path identified
 - ✅ Registry contract identified:
   - `0x9302E02e2869e129aC8516fE5eFFd51EA3082c09`
-- 🟡 Collaborating around an external signer hook for `--authorize`
+- 🟡 Ben agreed to add an external signer hook for `--authorize`
 - ⏳ Plug Keycard / air-gapped EIP-712 signing into Thurin
 - ⏳ Publish a hardware-authorized attestation on Sepolia
 - ⏳ Verify the final result through the registry/browser lookup
@@ -270,7 +273,8 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - 🟡 Continue keypad hardware debugging
 - 🟡 Improve hardware-side progress toward local PIN input
 - ✅ Document the broader project roadmap and current status
-- 🟡 Keep Thurin integration architecture current as upstream evolves
+- ✅ Updated Thurin experiment to current `identity-kit` 1.1.1
+- 🟡 Track Ben's external EIP-712 signer-hook work
 - 🟡 Track the OpenPGP artifact work needed for the next interoperability milestone
 - 🔬 Keep Mathom / Keycard Shell transport research queued as the middleware layer becomes more concrete
 
@@ -299,6 +303,8 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - ✅ Raw signature returned via QR
 - ✅ Thurin's PGP and Ethereum signing boundaries understood
 - ✅ secp256k1 verification support landed upstream in Thurin identity tooling
+- ✅ Ben's Thurin compatibility PR merged
+- ✅ Thurin experiment upgraded and regression-tested on `identity-kit` 1.1.1
 - ✅ Repository licensed under MIT
 
 ---

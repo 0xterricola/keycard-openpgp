@@ -132,7 +132,9 @@ Two OpenPGP.js compatibility details were found, and both are now handled inside
   curve. identity-kit clears that rejection on every verification path, so no `config` is needed
   by callers.
 - In Node, OpenPGP.js needs `eckey-utils` for this curve. identity-kit declares it as a
-  dependency, so `npm install` brings it in. The browser build needs nothing extra.
+  dependency, so `npm install` brings it in; `experiments/thurin/package.json` depends only on
+  identity-kit and openpgp. The browser build needs nothing extra. (The `test-openpgp.ts` and
+  `test-message-verify.ts` scripts call OpenPGP.js directly and rely on the same hoisted copy.)
 
 With `@thurinlabs/identity-kit@^1.0.2`, `verifyAttestation()` returns for the complete
 hardware-signed attestation, unmodified:

@@ -34,8 +34,14 @@ Thurin is the first serious external application integration and gives the proje
 - ✅ `--authorize` EIP-712 path identified
 - ✅ Registry contract identified:
   - `0x9302E02e2869e129aC8516fE5eFFd51EA3082c09`
-- 🟡 Ben agreed to add an external signer hook for `--authorize`
-- ⏳ Plug Keycard / air-gapped EIP-712 signing into Thurin
+- ✅ Thurin 0.7.0 external EIP-712 signer hook inspected and understood
+- ✅ External signer contract identified:
+  - typed EIP-712 data on stdin
+  - 65-byte recoverable Ethereum signature on stdout
+- ✅ `--sign-out` offline-signing handoff path understood
+- ✅ `authorize finish` recovery, nonce-check, and simulation path understood
+- ⏳ Produce a real 65-byte EIP-712 signature with the Keycard
+- ⏳ Complete a real `--sign-out` → air gap → Keycard → `authorize finish` flow
 - ⏳ Publish a hardware-authorized attestation on Sepolia
 - ⏳ Verify the final result through the registry/browser lookup
 
@@ -54,7 +60,7 @@ trusted hardware signer
   ↓
 Keycard
   ↓
-standard signature returned
+standard 65-byte recoverable Ethereum signature returned
   ↓
 Thurin performs normal recovery / verification / simulation
   ↓
@@ -81,6 +87,7 @@ OpenPGP is the first protocol adapter, not the entire project.
   - `0x9ce2e20fc392304fd1e50541ec67168913b5f3ff`
 - ✅ Raw hardware ECDSA signing works
 - ✅ Raw `r || s` signature returned from the card
+- ⚠️ Current prototype signs `SHA-256(message)` directly; this is not yet a standards-compliant OpenPGP signature artifact
 - ✅ Thurin's exact attestation message identified
 - ⏳ Construct proper OpenPGP signature digest
 - ⏳ Build standards-compliant ECDSA signature packet
@@ -99,7 +106,11 @@ OpenPGP is the first protocol adapter, not the entire project.
 
 ### Core design rule
 
-Protocol-specific logic belongs in protocol adapters. The trusted signer core should not contain Thurin-specific or application-specific behavior.
+Application-specific behavior must stay outside the trusted signer.
+
+Protocol-specific behavior belongs in isolated protocol adapters rather than the generic signer core. Any protocol logic required to independently validate the displayed intent and construct the exact bytes or digest being signed must run inside the trusted-device boundary.
+
+The signer must never blindly sign an opaque digest supplied by the online host when it cannot independently bind that digest to the human-readable intent.
 
 ---
 
@@ -107,7 +118,7 @@ Protocol-specific logic belongs in protocol adapters. The trusted signer core sh
 
 This is the layer between applications/protocol adapters and the trusted offline signer.
 
-Mathom is a reference for the asynchronous request → offline signer → response pattern.
+Mathom is a reference implementation to study for request → offline signer → response architecture.
 
 Keycard Shell is the target device whose QR/signing transport needs to be studied and aligned with.
 
@@ -117,7 +128,7 @@ Keycard Shell is the target device whose QR/signing transport needs to be studie
 - ✅ Device generates response QR codes
 - ✅ Prototype `KC1` request envelope works
 - ✅ Prototype `KC1` response envelope works
-- ✅ End-to-end asynchronous QR signing loop proven
+- ✅ End-to-end disconnected QR request → hardware signing → QR response loop proven
 - 🔬 Inspect Mathom request / response architecture
 - 🔬 Inspect Keycard Shell QR and signing protocols
 - 🔬 Determine BC-UR / multipart QR compatibility and fit
@@ -125,7 +136,8 @@ Keycard Shell is the target device whose QR/signing transport needs to be studie
 - ⏳ Protocol/version identifiers
 - ⏳ Request IDs / response correlation
 - ⏳ Anti-replay / nonce strategy
-- ⏳ Reject-over-truncate rendering rules
+- ✅ Prototype reject-over-truncate behavior proven for the current `KC1` message renderer
+- ⏳ Define generic reject-over-truncate rendering rules for arbitrary protocols
 - ⏳ Generic signing-response envelope
 - ⏳ Middleware API for applications
 - ⏳ Replace prototype-specific `KC1` transport with final format
@@ -175,8 +187,9 @@ Keycard Shell is the eventual target hardware.
 - ✅ NeoPGP card communication works
 - ✅ Hardware signing operation works
 - ✅ Signature-counter proof works
-  - REJECT: counter unchanged
-  - APPROVE: counter increments
+  - Request REJECT: counter unchanged
+  - PIN-stage REJECT: counter unchanged
+  - Request APPROVE + valid local PIN + PIN APPROVE: counter increments
 - ✅ Signing intent can be shown on the trusted display
 - ✅ Physical approval/rejection signing logic exists
 
@@ -272,7 +285,7 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 
 ## 7. Immediate Priorities
 
-### Today / current development session
+### Recently completed
 
 - ✅ Completed keypad electrical and matrix debugging
 - ✅ All 12 physical keypad buttons working under Linux
@@ -285,7 +298,7 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - ✅ Documented the broader project roadmap and current status
 - ✅ Updated Thurin experiment to current `identity-kit` 1.1.1
 - ✅ Verified Thurin 0.7.0 external EIP-712 signer / sign-out integration path
-- 🟡 Track the OpenPGP artifact work needed for the next interoperability milestone
+- ⏳ Implement the standards-compliant OpenPGP signing path on top of the proven raw hardware ECDSA primitive
 - 🔬 Keep Mathom / Keycard Shell transport research queued as the middleware layer becomes more concrete
 
 ### Next major milestones
@@ -308,6 +321,7 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - ✅ Same public point mapped to OpenPGP identity and Ethereum address
 - ✅ Trusted display operational
 - ✅ Camera-driven QR request works
+- ✅ End-to-end disconnected QR request → hardware signing → QR response loop proven
 - ✅ Physical APPROVE / REJECT decision affects signing
 - ✅ Full 3×4 physical keypad operational under Linux
 - ✅ Local NeoPGP PIN entry works through the trusted keypad
@@ -315,7 +329,8 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - ✅ PIN-stage cancellation fails closed with signature counter unchanged (`11 → 11`)
 - ✅ Successful local-PIN signing increments the signature counter (`10 → 11`)
 - ✅ Terminal PIN entry dependency removed
-- ✅ Signature counter proves reject does not sign and approve does
+- ✅ Signature counter proves request rejection and PIN cancellation do not sign
+- ✅ Signature counter proves approved request + valid local PIN produces a hardware signature
 - ✅ Raw signature returned via QR
 - ✅ Thurin's PGP and Ethereum signing boundaries understood
 - ✅ secp256k1 verification support landed upstream in Thurin identity tooling
@@ -333,6 +348,9 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - Unsupported or unrenderable requests must be rejected, not truncated or guessed.
 - PIN entry belongs on the trusted device.
 - Failed PIN verification must fail closed.
+- The trusted device must independently bind human-readable intent to the exact bytes or digest authorized for signing.
+- The signer must not blindly sign opaque host-supplied digests that it cannot independently validate against the displayed intent.
+- PIN values must never be displayed, logged, or returned over the transport.
 - Applications should receive standard cryptographic artifacts rather than hardware-specific formats.
 - Protocol-specific encoding belongs outside the trusted signer core.
 - The online application should not need to know which hardware produced a valid signature.

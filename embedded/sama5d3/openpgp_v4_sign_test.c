@@ -26,7 +26,7 @@ static int write_file(const char *path,
 int main(void)
 {
     static const uint8_t message[] =
-        "I control Ethereum address "
+        "I control the Ethereum address: "
         "0x9ce2e20fc392304fd1e50541ec67168913b5f3ff";
 
     static const uint8_t fingerprint[OPENPGP_V4_FINGERPRINT_LEN] = {

@@ -87,12 +87,13 @@ OpenPGP is the first protocol adapter, not the entire project.
   - `0x9ce2e20fc392304fd1e50541ec67168913b5f3ff`
 - ✅ Raw hardware ECDSA signing works
 - ✅ Raw `r || s` signature returned from the card
-- ⚠️ Current prototype signs `SHA-256(message)` directly; this is not yet a standards-compliant OpenPGP signature artifact
+- ✅ OpenPGP path now constructs the proper v4 signature digest and packet; the legacy `neopgp_sign_message()` compatibility wrapper still signs `SHA-256(message)` directly
 - ✅ Thurin's exact attestation message identified
-- ⏳ Construct proper OpenPGP signature digest
-- ⏳ Build standards-compliant ECDSA signature packet
-- ⏳ Build full OpenPGP clearsigned artifact
-- ⏳ Verify hardware-produced artifact with `identity-kit`
+- ✅ Construct proper OpenPGP signature digest
+- ✅ Build standards-compliant ECDSA signature packet
+- ✅ Build full OpenPGP clearsigned artifact
+- ✅ Verify hardware-produced artifact with `identity-kit`
+  - Evidence: SAMA5D3 constructed the OpenPGP v4 digest and signature packet, NeoPGP performed the secp256k1 private-key operation, GnuPG reported `Good signature`, and `@thurinlabs/identity-kit` returned `{ verified: true }` for the canonical Thurin statement.
 - ⏳ Define reusable external OpenPGP signing interface
 
 ### Future protocol adapters
@@ -298,15 +299,15 @@ The goal is a reusable trusted air-gapped signing system where applications hand
 - ✅ Documented the broader project roadmap and current status
 - ✅ Updated Thurin experiment to current `identity-kit` 1.1.1
 - ✅ Verified Thurin 0.7.0 external EIP-712 signer / sign-out integration path
-- ⏳ Implement the standards-compliant OpenPGP signing path on top of the proven raw hardware ECDSA primitive
+- ✅ Implement the standards-compliant OpenPGP signing path on top of the proven raw hardware ECDSA primitive
 - 🔬 Keep Mathom / Keycard Shell transport research queued as the middleware layer becomes more concrete
 
 ### Next major milestones
 
 1. ✅ Get all 12 keypad buttons electrically and logically correct
 2. ✅ Implement trusted local PIN entry with masked on-device feedback
-3. ⏳ Produce a standards-compliant OpenPGP signed artifact from the hardware signature
-4. ⏳ Make `identity-kit` verify that artifact successfully
+3. ✅ Produce a standards-compliant OpenPGP signed artifact from the hardware signature
+4. ✅ Make `identity-kit` verify that artifact successfully
 5. ⏳ Define / adopt the generic QR signing middleware
 6. ⏳ Add Keycard-backed EIP-712 authorization for Thurin
 7. ⏳ Publish and verify the Sepolia attestation

@@ -6,6 +6,12 @@
 
 typedef void (*neopgp_pin_progress_fn)(size_t digits);
 
+int neopgp_sign_digest(const uint8_t *digest,
+                       size_t digest_len,
+                       uint8_t *signature,
+                       size_t *signature_len,
+                       neopgp_pin_progress_fn pin_progress);
+
 int neopgp_sign_message(const char *message,
                         uint8_t *signature,
                         size_t *signature_len,

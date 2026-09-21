@@ -160,10 +160,11 @@ fail:
     return -1;
 }
 
-int neopgp_sign_message(const char *message,
-                        uint8_t *signature,
-                        size_t *signature_len,
-                        neopgp_pin_progress_fn pin_progress)
+int neopgp_sign_digest(const uint8_t *digest,
+                       size_t digest_len,
+                       uint8_t *signature,
+                       size_t *signature_len,
+                       neopgp_pin_progress_fn pin_progress)
 {
     SCARDCONTEXT ctx;
     SCARDHANDLE card;
@@ -173,9 +174,13 @@ int neopgp_sign_message(const char *message,
     DWORD resp_len;
 
     char pin[128] = {0};
-    uint8_t digest[SHA256_DIGEST_LENGTH];
 
     int result = -1;
+
+    if (!digest || digest_len != SHA256_DIGEST_LENGTH) {
+        fprintf(stderr, "Expected a 32-byte SHA-256 digest\n");
+        return -1;
+    }
 
     if (connect_card(&ctx, &card, &proto) != 0) {
         fprintf(stderr, "Could not connect to card\n");
@@ -233,10 +238,6 @@ int neopgp_sign_message(const char *message,
         goto out;
     }
 
-    SHA256((const unsigned char *)message,
-           strlen(message),
-           digest);
-
     uint8_t pso[5 + SHA256_DIGEST_LENGTH + 1];
 
     pso[0] = 0x00;
@@ -284,10 +285,34 @@ int neopgp_sign_message(const char *message,
 
 out:
     secure_zero(pin, sizeof(pin));
-    secure_zero(digest, sizeof(digest));
 
     SCardDisconnect(card, SCARD_LEAVE_CARD);
     SCardReleaseContext(ctx);
+
+    return result;
+}
+
+int neopgp_sign_message(const char *message,
+                        uint8_t *signature,
+                        size_t *signature_len,
+                        neopgp_pin_progress_fn pin_progress)
+{
+    uint8_t digest[SHA256_DIGEST_LENGTH];
+
+    if (!message)
+        return -1;
+
+    SHA256((const unsigned char *)message,
+           strlen(message),
+           digest);
+
+    int result = neopgp_sign_digest(digest,
+                                    sizeof(digest),
+                                    signature,
+                                    signature_len,
+                                    pin_progress);
+
+    secure_zero(digest, sizeof(digest));
 
     return result;
 }

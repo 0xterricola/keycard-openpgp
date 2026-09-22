@@ -12,9 +12,11 @@
 #include <winscard.h>
 #include <qrencode.h>
 #include "neopgp_sign.h"
+#include "openpgp_v4.h"
 #include "qr_request.h"
 
 #define TRUSTED_DISPLAY_MAX_MESSAGE 20
+#define TRUSTED_CERT_MAX_UID 40
 
 #define W 240
 #define H 240
@@ -68,24 +70,80 @@ static const uint8_t upper[26][7] = {
     {31,1,2,4,8,16,31}       /* Z */
 };
 
+static const uint8_t lower[26][7] = {
+    {0,14,1,15,17,19,13},       /* a */
+    {16,16,30,17,17,17,30},     /* b */
+    {0,14,17,16,16,17,14},      /* c */
+    {1,1,15,17,17,17,15},       /* d */
+    {0,14,17,31,16,16,14},      /* e */
+    {6,9,8,28,8,8,8},           /* f */
+    {0,15,17,17,15,1,14},       /* g */
+    {16,16,30,17,17,17,17},     /* h */
+    {4,0,12,4,4,4,14},          /* i */
+    {2,0,6,2,2,18,12},          /* j */
+    {16,16,18,20,24,20,18},     /* k */
+    {12,4,4,4,4,4,14},          /* l */
+    {0,0,26,21,21,21,21},       /* m */
+    {0,0,30,17,17,17,17},       /* n */
+    {0,14,17,17,17,17,14},      /* o */
+    {0,30,17,17,30,16,16},      /* p */
+    {0,15,17,17,15,1,1},        /* q */
+    {0,0,22,25,16,16,16},       /* r */
+    {0,15,16,14,1,1,30},        /* s */
+    {8,8,28,8,8,9,6},           /* t */
+    {0,0,17,17,17,19,13},       /* u */
+    {0,0,17,17,17,10,4},        /* v */
+    {0,0,17,17,21,21,10},       /* w */
+    {0,0,17,10,4,10,17},        /* x */
+    {0,17,17,17,15,1,14},       /* y */
+    {0,0,31,2,4,8,31}           /* z */
+};
+
 static const uint8_t glyph_space[7] = {0,0,0,0,0,0,0};
 static const uint8_t glyph_dot[7]   = {0,0,0,0,0,12,12};
 static const uint8_t glyph_dash[7]  = {0,0,0,31,0,0,0};
 static const uint8_t glyph_colon[7] = {0,12,12,0,12,12,0};
+static const uint8_t glyph_at[7]    = {14,17,23,21,23,16,14};
+static const uint8_t glyph_lt[7]    = {2,4,8,16,8,4,2};
+static const uint8_t glyph_gt[7]    = {8,4,2,1,2,4,8};
+static const uint8_t glyph_plus[7]  = {0,4,4,31,4,4,0};
 
 static const uint8_t *glyph(char c)
 {
     if (c >= 'A' && c <= 'Z')
         return upper[c - 'A'];
+
+    if (c >= 'a' && c <= 'z')
+        return lower[c - 'a'];
+
     if (c >= '0' && c <= '9')
         return digits[c - '0'];
 
     switch (c) {
+    case ' ': return glyph_space;
     case '.': return glyph_dot;
     case '-': return glyph_dash;
     case ':': return glyph_colon;
-    default:  return glyph_space;
+    case '@': return glyph_at;
+    case '<': return glyph_lt;
+    case '>': return glyph_gt;
+    case '+': return glyph_plus;
+    default:  return NULL;
     }
+}
+
+static int text_is_renderable(const char *s)
+{
+    if (!s)
+        return 0;
+
+    while (*s) {
+        if (!glyph(*s))
+            return 0;
+        s++;
+    }
+
+    return 1;
 }
 
 static void pixel(int x, int y, uint16_t color)
@@ -103,6 +161,9 @@ static void clear_screen(uint16_t color)
 static void draw_char(int x, int y, char c, int scale, uint16_t color)
 {
     const uint8_t *g = glyph(c);
+
+    if (!g)
+        return;
 
     for (int row = 0; row < 7; row++) {
         for (int col = 0; col < 5; col++) {
@@ -368,6 +429,116 @@ static void show_prompt(const char *fp, const char *message)
     lcd_flush();
 }
 
+static int show_certification_prompt(
+    const char *uid,
+    const uint8_t fingerprint[OPENPGP_V4_FINGERPRINT_LEN])
+{
+    const uint16_t BLACK = 0x0000;
+    const uint16_t WHITE = 0xFFFF;
+    const uint16_t GREEN = 0x07E0;
+    const uint16_t RED   = 0xF800;
+
+    static const char hex[] = "0123456789ABCDEF";
+
+    char fp_hex[OPENPGP_V4_FINGERPRINT_LEN * 2 + 1];
+    char fp_line1[21];
+    char fp_line2[21];
+
+    size_t uid_len;
+
+    if (!uid || !fingerprint)
+        return -1;
+
+    uid_len = strlen(uid);
+
+    if (uid_len == 0 || uid_len > TRUSTED_CERT_MAX_UID)
+        return -1;
+
+    if (!text_is_renderable(uid))
+        return -1;
+
+    for (size_t i = 0; i < OPENPGP_V4_FINGERPRINT_LEN; i++) {
+        fp_hex[i * 2]     = hex[fingerprint[i] >> 4];
+        fp_hex[i * 2 + 1] = hex[fingerprint[i] & 0x0F];
+    }
+
+    fp_hex[40] = '\0';
+
+    memcpy(fp_line1, fp_hex, 20);
+    fp_line1[20] = '\0';
+
+    memcpy(fp_line2, fp_hex + 20, 20);
+    fp_line2[20] = '\0';
+
+    /*
+     * Trusted certification review.
+     *
+     * Nothing is truncated:
+     *   - UID must fit one scale-1 line.
+     *   - all 40 fingerprint hex digits are displayed.
+     */
+    clear_screen(BLACK);
+
+    draw_text(48, 10, "OPENPGP CERT", 2, WHITE);
+
+    draw_text(90, 43, "TARGET UID", 1, WHITE);
+
+    {
+        int uid_x = (W - (int)uid_len * 6) / 2;
+
+        if (uid_x < 0)
+            return -1;
+
+        draw_text(uid_x, 58, uid, 1, WHITE);
+    }
+
+    draw_text(66, 86, "KEY FINGERPRINT", 1, WHITE);
+
+    draw_text(60, 103, fp_line1, 1, WHITE);
+    draw_text(60, 116, fp_line2, 1, WHITE);
+
+    draw_text(48, 162, "APPROVE CERT", 2, GREEN);
+    draw_text(42, 198, "REJECT CANCEL", 2, RED);
+
+    lcd_flush();
+
+    return 0;
+}
+
+static int show_certification_review(
+    const uint8_t *primary_key_body,
+    size_t primary_key_body_len,
+    const char *uid,
+    uint8_t fingerprint_out[OPENPGP_V4_FINGERPRINT_LEN])
+{
+    uint8_t fingerprint[OPENPGP_V4_FINGERPRINT_LEN];
+
+    if (!primary_key_body || !uid)
+        return -1;
+
+    /*
+     * Security boundary:
+     *
+     * The target fingerprint is never accepted as authoritative input.
+     * It is derived here from the exact primary-key body being reviewed.
+     */
+    if (openpgp_v4_primary_key_fingerprint(
+            primary_key_body,
+            primary_key_body_len,
+            fingerprint) != 0)
+        return -1;
+
+    if (show_certification_prompt(uid, fingerprint) != 0)
+        return -1;
+
+    if (fingerprint_out)
+        memcpy(fingerprint_out,
+               fingerprint,
+               OPENPGP_V4_FINGERPRINT_LEN);
+
+    return 0;
+}
+
 static void show_result(int approved)
 {
     const uint16_t WHITE = 0xFFFF;
@@ -453,6 +624,90 @@ static int wait_for_decision(void)
     return -1;
 }
 
+
+static int show_certification_response_qr(
+    const uint8_t *signature_packet,
+    size_t signature_packet_len)
+{
+    const uint16_t WHITE = 0xFFFF;
+    const uint16_t BLACK = 0x0000;
+
+    static const char prefix[] =
+        "KC1|OP=PGP_CERT_RESULT|CERT=";
+
+    char packet_hex[513];
+    char payload[640];
+
+    if (!signature_packet ||
+        signature_packet_len == 0 ||
+        signature_packet_len * 2 + 1 > sizeof(packet_hex))
+        return -1;
+
+    for (size_t i = 0; i < signature_packet_len; i++)
+        snprintf(&packet_hex[i * 2], 3, "%02X", signature_packet[i]);
+
+    int n = snprintf(
+        payload,
+        sizeof(payload),
+        "%s%s",
+        prefix,
+        packet_hex);
+
+    if (n < 0 || (size_t)n >= sizeof(payload))
+        return -1;
+
+    QRcode *qr = QRcode_encodeString8bit(
+        payload,
+        0,
+        QR_ECLEVEL_L);
+
+    if (!qr) {
+        fprintf(stderr, "Certification response QR encoding failed\n");
+        return -1;
+    }
+
+    const int quiet = 4;
+    const int modules = qr->width + quiet * 2;
+    const int scale = W / modules;
+
+    if (scale < 1) {
+        fprintf(stderr,
+                "Certification response QR too large for display\n");
+        QRcode_free(qr);
+        return -1;
+    }
+
+    const int rendered = modules * scale;
+    const int x0 = (W - rendered) / 2;
+    const int y0 = (H - rendered) / 2;
+
+    clear_screen(WHITE);
+
+    for (int y = 0; y < qr->width; y++) {
+        for (int x = 0; x < qr->width; x++) {
+            if (!(qr->data[y * qr->width + x] & 1))
+                continue;
+
+            int px = x0 + (x + quiet) * scale;
+            int py = y0 + (y + quiet) * scale;
+
+            for (int yy = 0; yy < scale; yy++)
+                for (int xx = 0; xx < scale; xx++)
+                    pixel(px + xx, py + yy, BLACK);
+        }
+    }
+
+    lcd_flush();
+
+    printf("Certification response QR version: %d\n", qr->version);
+    printf("Certification response QR width: %d modules\n", qr->width);
+    printf("Certification response QR scale: %d pixels/module\n", scale);
+    printf("Certification response packet: %zu bytes\n",
+           signature_packet_len);
+
+    QRcode_free(qr);
+    return 0;
+}
 
 static int show_response_qr(const char *fp,
                             const uint8_t *signature,
@@ -569,6 +824,17 @@ int main(void)
                 message_len,
                 TRUSTED_DISPLAY_MAX_MESSAGE);
 
+        return 1;
+    }
+
+    if (!text_is_renderable(request.message)) {
+        clear_screen(0x0000);
+        draw_text(48, 105, "BAD CHAR", 3, 0xF800);
+        lcd_flush();
+
+        fprintf(stderr,
+                "Rejected request: message contains a character "
+                "the trusted display cannot render\n");
         return 1;
     }
 

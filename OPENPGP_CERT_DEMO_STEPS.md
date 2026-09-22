@@ -392,21 +392,65 @@ KC1|OP=PGP_CERT_RESULT|CERT=<OpenPGP Signature packet>
 
 > The signed OpenPGP certification is returned optically as another QR.
 > The signing device is still disconnected from Ethernet.
+>
+> I'm using a live webcam preview so I can frame and focus the QR in real
+> time, then I'll capture that visible QR from the Mac screen.
 
-Use the NexiGo webcam connected to the Mac:
+## Open the live NexiGo preview
 
-```bash
-imagesnap \
-  -d "NexiGo N930AF FHD Webcam" \
-  -w 5 \
-  /tmp/sama-cert-response.jpg
+Open **QuickTime Player → File → New Movie Recording**.
+
+Select:
+
+```text
+NexiGo N930AF FHD Webcam
 ```
 
-Decode the response:
+as the camera.
+
+Do not start recording. Use the QuickTime window only as a live preview.
+
+Position the NexiGo so the SAMA response QR is:
+
+- fully visible;
+- square to the camera;
+- sharply focused;
+- large in the frame;
+- not blown out by the display brightness.
+
+## Capture the visible QR
+
+With the live QuickTime preview still open, run:
+
+```bash
+screencapture -i /tmp/sama-cert-response.png
+```
+
+Drag tightly around the QR in the QuickTime preview.
+
+The captured image is written to:
+
+```text
+/tmp/sama-cert-response.png
+```
+
+## Confirm that the QR is readable
+
+```bash
+zbarimg --raw /tmp/sama-cert-response.png
+```
+
+Expected output begins with:
+
+```text
+KC1|OP=PGP_CERT_RESULT|CERT=
+```
+
+## Decode the OpenPGP response
 
 ```bash
 python3 demo/openpgp-certification-v1/decode-response.py \
-  /tmp/sama-cert-response.jpg
+  /tmp/sama-cert-response.png
 ```
 
 Expected result:

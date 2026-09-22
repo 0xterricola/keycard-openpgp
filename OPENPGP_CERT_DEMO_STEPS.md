@@ -394,7 +394,8 @@ KC1|OP=PGP_CERT_RESULT|CERT=<OpenPGP Signature packet>
 > The signing device is still disconnected from Ethernet.
 >
 > I'm using a live webcam preview so I can frame and focus the QR in real
-> time, then I'll capture that visible QR from the Mac screen.
+> time, then I'll capture the QR from the Mac screen and decode the returned
+> OpenPGP signature.
 
 ## Open the live NexiGo preview
 
@@ -418,32 +419,46 @@ Position the NexiGo so the SAMA response QR is:
 - large in the frame;
 - not blown out by the display brightness.
 
-## Capture the visible QR
+## Capture the QR from the live preview
 
-With the live QuickTime preview still open, run:
-
-```bash
-screencapture -i /tmp/sama-cert-response.png
-```
-
-Drag tightly around the QR in the QuickTime preview.
-
-The captured image is written to:
+With the QuickTime preview still open, press:
 
 ```text
-/tmp/sama-cert-response.png
+Shift + Command + 4
+```
+
+Drag a rectangle tightly around the QR in the QuickTime preview.
+
+Let macOS save the screenshot normally.
+
+## Find the newest screenshot
+
+Run:
+
+```bash
+SHOT="$(find ~/Desktop -maxdepth 1 -type f \
+  \( -name 'Screenshot*.png' -o -name 'Screen Shot*.png' \) \
+  -print0 | xargs -0 ls -t | head -1)"
+
+echo "$SHOT"
 ```
 
 ## Confirm that the QR is readable
 
 ```bash
-zbarimg --raw /tmp/sama-cert-response.png
+zbarimg --raw "$SHOT"
 ```
 
 Expected output begins with:
 
 ```text
 KC1|OP=PGP_CERT_RESULT|CERT=
+```
+
+## Copy the screenshot to the fixed demo path
+
+```bash
+cp "$SHOT" /tmp/sama-cert-response.png
 ```
 
 ## Decode the OpenPGP response

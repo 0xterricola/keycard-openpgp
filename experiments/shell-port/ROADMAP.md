@@ -2,7 +2,7 @@
 
 ## Overall Project
 
-`█████████████████░░░░░░░░░░░░░░  ~55%`
+`████████████████████████░░░░░░░░  ~75%`
 
 ### Goal
 
@@ -161,104 +161,121 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
 
 ---
 
-# Planned PR — OpenPGP Identity Orchestration
+# OpenPGP Identity Orchestration
 
 **Branch:** `feature/openpgp-orchestration`
 
-**Current active branch**
+**Remote:** `origin/feature/openpgp-orchestration`
 
-`████████████████░░░░░░░░░░░░░░  ~50% 🟡 IN PROGRESS`
+**Standalone PR:** not opened; branch is kept as a pushed checkpoint for now
+
+`████████████████████████████████  100% ✅ CORE FLOW COMPLETE`
 
 ## Completed Commits
 
 - `a2bd3fe` — `openpgp: prepare primary key from Keycard path`
 - `28fa692` — `openpgp: prepare UID certification digest`
+- `c55ea7e` — `openpgp: confirm identity before certification`
+- `8906ec6` — `openpgp: sign approved UID certification`
+- `89c4262` — `openpgp: build UID certification packet`
+- `da9852a` — `openpgp: use positive UID certification signature`
+- `9613b81` — `openpgp: assemble and verify identity`
+- `e50e282` — `openpgp: orchestrate identity creation`
+- `374fb31` — `openpgp: add dedicated QR identity flow`
 
 ## Completed
 
-- [x] explicit path passed into OpenPGP orchestration
+- [x] explicit trusted path passed into OpenPGP orchestration
 - [x] no mutation of wallet-oriented `g_core.bip44_path`
 - [x] Keycard public-key export
 - [x] 65-byte secp256k1 public point
 - [x] 79-byte OpenPGP v4 primary-key body
 - [x] 20-byte OpenPGP fingerprint
 - [x] UID certification preimage
-- [x] v4 signature fields
+- [x] positive UID certification signature type `0x13`
 - [x] exact SHA-256 certification digest
+- [x] display exact UID before signing
+- [x] display derived fingerprint before signing
+- [x] cancellable physical approval
+- [x] Keycard ECDSA signing
+- [x] signature decoding / normalization to `r || s`
+- [x] OpenPGP signature packet construction
+- [x] complete transferable certificate assembly
+- [x] issuer fingerprint / key-ID binding checks
+- [x] cryptographic self-cert verification before output
+- [x] UID input snapshot for safe request/output aliasing
+- [x] top-level identity orchestration helper
+- [x] dedicated `UR:BYTES` QR request handler
+- [x] versioned OpenPGP request parsing
+- [x] verified certificate encoded as `UR:BYTES`
+- [x] response QR display
+- [x] generic `UR_ANY_TX` dispatch left unchanged
 
 ## Current Pipeline
 
-    Shell-selected path
+    Shell-selected trusted path              ✅
             ↓
-    Keycard EXPORT KEY                    ✅
+    Keycard EXPORT KEY                      ✅
             ↓
-    secp256k1 public point                ✅
+    secp256k1 public point                  ✅
             ↓
-    OpenPGP primary-key body              ✅
+    OpenPGP primary-key body                ✅
             ↓
-    OpenPGP fingerprint                  ✅
+    OpenPGP fingerprint                     ✅
             ↓
-    UID + creation_time                  ✅
+    UID + creation_time                     ✅
             ↓
-    certification preimage               ✅
+    certification digest                    ✅
             ↓
-    signature fields                     ✅
+    display UID + fingerprint               ✅
             ↓
-    SHA-256 certification digest         ✅
+    physical user confirmation              ✅
             ↓
-    ----------------------------------------
-    UID + FINGERPRINT APPROVAL            ← NEXT
-    ----------------------------------------
+    Keycard signs digest                    ✅
             ↓
-    physical user confirmation           ⬜
+    decode r || s                           ✅
             ↓
-    Keycard signs digest                 ⬜
+    positive certification packet           ✅
             ↓
-    decode r || s                        ⬜
+    assemble complete certificate           ✅
             ↓
-    build OpenPGP signature packet       ⬜
+    validate key/fingerprint binding        ✅
             ↓
-    assemble complete certificate        ⬜
+    cryptographically self-verify           ✅
             ↓
-    self-verify certificate              ⬜
+    encode response as UR:BYTES             ✅
             ↓
-    encode response as UR:BYTES          ⬜
-            ↓
-    display response QR                  ⬜
+    display response QR                     ✅
 
-## Expected Next Commits
+## Verification Checkpoint
 
-    NEXT
-    openpgp: confirm identity before certification
+- [x] `git diff --check` clean
+- [x] clean release build passes `385/385`
+- [x] core task stack confirmed as 2048 × 32-bit = 8192 bytes
+- [x] `core_openpgp_create_identity_at_path()` frame: 680 bytes
+- [x] `core_openpgp_qr_run()` frame: 72 bytes
+- [x] branch pushed and tracking `origin/feature/openpgp-orchestration`
 
-    THEN
-    openpgp: sign UID certification with Keycard
+## Remaining Outside Core Orchestration
 
-    THEN
-    openpgp: assemble and verify identity certificate
+- [ ] choose final Shell-owned production derivation path
+- [ ] add OpenPGP menu/action entry
+- [ ] bind menu action to approved path policy
+- [ ] physical Shell end-to-end test
+- [ ] final GnuPG validation
 
-    THEN
-    openpgp: add QR identity creation flow
+## PR Strategy
 
-## Status
+No standalone orchestration PR is being opened at this checkpoint.
 
-- [x] branch exists locally
-- [x] first two orchestration commits complete
-- [x] repeated firmware builds passing
-- [ ] approval UI
-- [ ] signing
-- [ ] certificate assembly
-- [ ] QR flow
-- [ ] PR opened
+The branch is pushed for backup, comparison, and review while the production derivation-path policy is resolved. After that decision, the remaining integration can be completed and folded into the existing OpenPGP PR stack.
 
-
----
 
 # Derivation Policy
 
 **Purpose:** Final Shell-owned OpenPGP derivation path
 
-`██████░░░░░░░░░░░░░░░░░░░░░░  ~20% ⏳ BLOCKED ON GUIDANCE`
+`████████████░░░░░░░░░░░░░░░░░░░░  ~40% ⏳ BLOCKED ON GUIDANCE`
 
 ## Completed
 
@@ -268,29 +285,36 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
 - [x] SLIP-0017 investigated
 - [x] ERC-1581 / Keycard namespace investigated
 - [x] path decision isolated from orchestration plumbing
+- [x] existing multisig EIP-1581 path identified
+- [x] multisig already owns `m/43'/60'/1581'/0'/0`
+- [x] OpenPGP will not silently reuse the multisig identity path
 - [x] maintainer question sent
+- [x] orchestration remains path-agnostic until policy is decided
 
 ## Remaining
 
-- [ ] exact production namespace/path
-- [ ] define path constants/helper
-- [ ] wire final policy into identity workflow
+- [ ] exact OpenPGP production namespace / key type / path
+- [ ] maintainer approval of reserved path
+- [ ] define final path constants/helper
+- [ ] wire final policy into OpenPGP menu/action
 - [ ] document rationale
 
 ## Expected Commit
 
     openpgp: define identity derivation path
 
-**Important:** This does not block the current approval/signing plumbing.
+## Current Blocker
 
-The current APIs accept an explicit path so the final namespace can be inserted later without redesigning the feature.
+The Shell-side cryptographic and QR plumbing is complete.
 
+The remaining policy question is which distinct Keycard / EIP-1581 path should be reserved for OpenPGP. Multisig already uses `m/43'/60'/1581'/0'/0`, so OpenPGP must not accidentally collide with that identity key.
 
----
+This blocks final menu wiring and physical E2E testing, but it does not require redesigning the completed orchestration APIs.
+
 
 # Shell UI + QR Integration
 
-`████████░░░░░░░░░░░░░░░░░░░░  ~25% 🟡`
+`███████████████████████████░░░░░  ~85% 🟡`
 
 ## Completed
 
@@ -298,32 +322,41 @@ The current APIs accept an explicit path so the final namespace can be inserted 
 - [x] BYTES transport already available
 - [x] existing QR output supports explicit BYTES
 - [x] decided not to add generic BYTES to `UR_ANY_TX`
-- [x] dedicated OpenPGP action architecture identified
+- [x] dedicated OpenPGP action architecture
+- [x] `core_openpgp_qr_run()` implemented
+- [x] `ui_qrscan(BYTES, ...)`
+- [x] decode outer `UR:BYTES` CBOR byte string
+- [x] parse versioned OpenPGP request
+- [x] reject unsupported operation
+- [x] show exact requested UID
+- [x] show derived fingerprint
+- [x] cancellable physical approval
+- [x] execute approved identity workflow
+- [x] construct and self-verify certificate
+- [x] encode certificate as BYTES
+- [x] display certificate response QR
+- [x] request/output heap aliasing handled safely
+- [x] generic transaction QR dispatch remains unchanged
 
 ## Remaining
 
-- [ ] OpenPGP menu/action
-- [ ] `ui_qrscan(BYTES, ...)`
-- [ ] parse OpenPGP request
-- [ ] show UID
-- [ ] show fingerprint
-- [ ] cancellable physical approval
-- [ ] execute approved identity workflow
-- [ ] output certificate via BYTES QR
+- [ ] add OpenPGP menu/action entry
+- [ ] bind action to final Shell-owned derivation path
+- [ ] add/confirm user-facing failure behavior during physical testing
+- [ ] physical QR request/response test
 
 ## Security Rule
 
 Generic QR scanning must not accidentally turn arbitrary `UR:BYTES`
 payloads into OpenPGP signing requests.
 
-OpenPGP gets a dedicated, purpose-specific action.
+OpenPGP has a dedicated purpose-specific action and explicitly requests
+`BYTES`; the existing generic transaction QR dispatcher remains unchanged.
 
-
----
 
 # Final Device + GnuPG Validation
 
-`██████░░░░░░░░░░░░░░░░░░░░░░  ~20% ⬜`
+`████████░░░░░░░░░░░░░░░░░░░░░░░░  ~25% ⬜`
 
 ## Already Proven
 
@@ -334,11 +367,17 @@ OpenPGP gets a dedicated, purpose-specific action.
 - [x] valid self-signature demonstrated
 - [x] primitive host harness
 - [x] request-protocol host harness
+- [x] complete Shell-side identity construction path
+- [x] Shell-side certificate self-verification path
+- [x] dedicated Shell `UR:BYTES` identity handler builds
 - [x] repeated production firmware builds
 - [x] repeated test firmware builds
+- [x] clean full release build reaches `385/385`
 
 ## Final Shell E2E Still Required
 
+- [ ] finalize production derivation path
+- [ ] expose OpenPGP action in Shell menu
 - [ ] generate CREATE_IDENTITY request
 - [ ] scan request with physical Shell
 - [ ] Shell derives physical Keycard public key
@@ -385,8 +424,6 @@ OpenPGP gets a dedicated, purpose-specific action.
     GnuPG fingerprint == Shell fingerprint ✅
 
 
----
-
 # Branch / PR Stack
 
     upstream/master
@@ -411,12 +448,25 @@ OpenPGP gets a dedicated, purpose-specific action.
     feature/openpgp-orchestration
     a2bd3fe
     28fa692
+    c55ea7e
+    8906ec6
+    89c4262
+    da9852a
+    9613b81
+    e50e282
+    374fb31
        |
-       +-- CURRENT BRANCH 🟡
-           MORE COMMITS COMING
+       +-- PUSHED TO origin ✅
+       +-- NO STANDALONE PR RIGHT NOW
+       |
+       v
+    derivation path policy
+       |
+       +-- WAITING ON MAINTAINER ⏳
+       |
+       v
+    menu wiring + physical E2E
 
-
----
 
 # Current Exact Position
 
@@ -424,7 +474,7 @@ OpenPGP gets a dedicated, purpose-specific action.
             ↓
     UID + creation_time                  ✅
             ↓
-    Shell-owned path interface           ✅
+    trusted path interface               ✅
             ↓
     Keycard public-key export            ✅
             ↓
@@ -434,27 +484,35 @@ OpenPGP gets a dedicated, purpose-specific action.
             ↓
     Certification digest                 ✅
             ↓
+    Display UID + fingerprint            ✅
+            ↓
+    User approval                        ✅
+            ↓
+    Keycard certification signature      ✅
+            ↓
+    Positive UID certification packet    ✅
+            ↓
+    Certificate assembly                 ✅
+            ↓
+    Fingerprint / issuer binding          ✅
+            ↓
+    Cryptographic self-verification      ✅
+            ↓
+    Dedicated UR:BYTES request           ✅
+            ↓
+    UR:BYTES certificate response        ✅
+            ↓
     +------------------------------------+
-    | DISPLAY UID + FINGERPRINT          |
-    |          ← WE ARE HERE             |
+    | PRODUCTION DERIVATION PATH         |
+    |      ← WE ARE HERE / BLOCKED       |
     +------------------------------------+
             ↓
-    User approval                        ⬜
-            ↓
-    Keycard certification signature      ⬜
-            ↓
-    Certificate assembly                 ⬜
-            ↓
-    Self-verification                    ⬜
-            ↓
-    UR:BYTES response                    ⬜
+    OpenPGP menu/action                  ⬜
             ↓
     Physical Shell E2E                   ⬜
             ↓
-    GnuPG validation                     ⬜
+    GnuPG final validation               ⬜
 
-
----
 
 # Project Snapshot
 
@@ -466,21 +524,29 @@ OpenPGP gets a dedicated, purpose-specific action.
     ████████████████████████████████ 100% ✅
     DRAFT PR OPEN / DEPENDS ON #225
 
-    Planned PR — Identity orchestration
-    ████████████████░░░░░░░░░░░░░░  50% 🟡
-    CURRENT ACTIVE WORK
+    Identity orchestration core
+    ████████████████████████████████ 100% ✅
+    COMPLETE / BRANCH PUSHED / NO STANDALONE PR
 
     Derivation policy
-    ██████░░░░░░░░░░░░░░░░░░░░░░  20% ⏳
+    ████████████░░░░░░░░░░░░░░░░░░░  40% ⏳
     WAITING ON MAINTAINER
 
+    Shell UI + QR integration
+    ███████████████████████████░░░░░  85% 🟡
+    CORE QR FLOW COMPLETE / MENU PATH PENDING
+
     Device + GnuPG E2E
-    ██████░░░░░░░░░░░░░░░░░░░░░░  20% ⬜
-    PENDING COMPLETE WORKFLOW
+    ████████░░░░░░░░░░░░░░░░░░░░░░  25% ⬜
+    WAITING ON PATH + PHYSICAL TEST
 
+    Overall project
+    ████████████████████████░░░░░░░░  75% 🟡
+    SOFTWARE VERTICAL SLICE COMPLETE THROUGH VERIFIED UR:BYTES OUTPUT
 
----
 
 ## Next Checkbox
 
-- [ ] UID + derived fingerprint approval UI
+- [ ] maintainer selects / approves the production OpenPGP derivation path
+- [ ] define that path in Shell and wire the OpenPGP menu/action
+- [ ] run the first physical Shell CREATE_IDENTITY E2E

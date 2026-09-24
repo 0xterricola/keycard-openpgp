@@ -32,6 +32,48 @@ int main(int argc, char **argv) {
   }
   printf("PASS: parsed three packets\n");
 
+  /*
+   * Golden-vector test for Shell public-key-body builder.
+   * Rebuild the known-good Keycard primary-key body and require
+   * byte-for-byte equality with the fixture.
+   */
+  if (target.primary_key_body_len != 79) {
+    printf("FAIL: unexpected primary-key body length\n");
+    return 1;
+  }
+
+  uint32_t key_creation_time =
+      ((uint32_t)target.primary_key_body[1] << 24) |
+      ((uint32_t)target.primary_key_body[2] << 16) |
+      ((uint32_t)target.primary_key_body[3] << 8) |
+      (uint32_t)target.primary_key_body[4];
+
+  const uint8_t *key_point = &target.primary_key_body[14];
+
+  uint8_t rebuilt_key_body[79];
+  size_t rebuilt_key_body_len = 0;
+
+  if (openpgp_v4_build_public_key_body(
+          key_point,
+          65,
+          key_creation_time,
+          rebuilt_key_body,
+          sizeof(rebuilt_key_body),
+          &rebuilt_key_body_len) != 0) {
+    printf("FAIL: public-key body builder\n");
+    return 1;
+  }
+
+  if (rebuilt_key_body_len != target.primary_key_body_len ||
+      memcmp(rebuilt_key_body,
+             target.primary_key_body,
+             target.primary_key_body_len) != 0) {
+    printf("FAIL: rebuilt public-key body mismatch\n");
+    return 1;
+  }
+
+  printf("PASS: rebuilt Keycard public-key body matches fixture\n");
+
   char uid[256];
   size_t uid_len = target.user_id_len < 255 ? target.user_id_len : 255;
   memcpy(uid, target.user_id, uid_len);

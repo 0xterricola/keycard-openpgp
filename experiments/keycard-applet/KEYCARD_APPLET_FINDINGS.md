@@ -1,72 +1,102 @@
 # Keycard applet: OpenPGP feasibility findings
 
-Source reviewed: `keycard-tech/status-keycard` @ `6f8544a`
-
 ## Question
 
 Can the existing Keycard applet serve as the signing backend for OpenPGP,
-with all PGP-specific logic implemented on Shell, avoiding an applet install?
+with all PGP-specific logic implemented on the host or on Shell, avoiding
+an applet install?
 
-## Summary
+## Answer
 
-Yes for the core signing and key-export primitives. No applet change is
-required to produce OpenPGP signatures. Two findings need a decision:
-curve coverage, and the absence of a signature counter.
+Yes. Demonstrated end to end on a retail Keycard with no applet changes
+of any kind.
 
-## SIGN
+Hardware: retail Keycard, applet 3.1. Host: macOS, OMNIKEY reader,
+Python `keycard` SDK 0.3.0 over PC/SC.
 
-`KeycardApplet.java`
+1. SELECT, open Secure Channel V1 with an existing pairing, VERIFY PIN
+2. EXPORT KEY (public only) at `m/44'/60'/0'/0/0` -> 65-byte uncompressed
+   SEC1 point
+3. build a v4 public-key packet body from that point with a fixed
+   creation time
+4. derive the fingerprint: `A1265C689EC7C60018C0AFB023A92D87D63F7E7C`
+5. build the certification preimage over key body + UID `keycard-test`
+6. SIGN the 32-byte digest on the card
+7. assemble public-key + UID + signature packets
+8. import into a scratch GnuPG keyring
 
-    INS_SIGN = 0xC0
+Result:
+
+    pub   secp256k1 [SCA]
+          A1265C689EC7C60018C0AFB023A92D87D63F7E7C
+    uid           keycard-test
+    sig!3        23A92D87D63F7E7C  [self-signature]
+
+    gpg: 1 good signature
+
+`sig!3` means GnuPG verified the signature cryptographically. The
+self-certification was produced by the card.
+
+Notes:
+
+- EXPORT KEY and SIGN both used `make_current=False`; no persistent card
+  state was changed
+- the creation time is part of the fingerprint preimage. It must be a
+  deliberate, fixed choice: changing it changes the key's identity
+- the signature result also returns the public point, matching EXPORT KEY
+
+## Why it works
+
+Source reviewed: `keycard-tech/status-keycard` @ `6f8544a`
+
+### SIGN
+
+`KeycardApplet.java`, `INS_SIGN = 0xC0`
 
 - Input is a bare precomputed hash. For ECDSA the length is
   `MessageDigest.LENGTH_SHA_256` (1059), i.e. exactly 32 bytes.
 - `secp256k1.signHash(...)` is called directly (1084); the card does not
   rehash or wrap the input.
-- Requires an open secure channel and either a verified PIN or a
-  pinless key (1037).
+- Requires an open secure channel and either a verified PIN or a pinless
+  key (1037).
 
-This is exactly the primitive OpenPGP needs: the host builds the
-certification preimage, hashes it, and submits 32 bytes.
+Exactly the primitive OpenPGP needs: the host builds the certification
+preimage, hashes it, and submits 32 bytes.
 
-## Signature encoding
+### EXPORT KEY
+
+    INS_EXPORT_KEY = 0xC2
+    EXPORT_KEY_P2_PUBLIC_ONLY      = 0x01
+    EXPORT_KEY_P2_EXTENDED_PUBLIC  = 0x02
+
+Public-only export, addressable by BIP-32 path. Requires an open secure
+channel and a verified PIN (1093). Sufficient to derive a PGP fingerprint
+and an Ethereum address from the same point.
+
+### Signature encoding
 
 `SECP256k1.java`
 
     ecdsaSign -> crypto.ecdsa.signPreComputedHash(...)  (195)
               -> crypto.fixS(...)                        (196)
 
-- Output is DER-encoded ECDSA (SEQUENCE of two INTEGERs).
-- `fixS` applies low-S normalisation (BIP-62). Valid ECDSA; harmless for
-  OpenPGP, but the card will never emit a high-S signature.
-- To build an OpenPGP signature packet: parse DER for r and s, re-encode
-  as MPIs.
-
-## Response structure
-
-The SIGN response is a TLV template containing the public key and the
-signature together:
+The applet emits DER-encoded ECDSA (SEQUENCE of two INTEGERs), wrapped in
+a TLV template alongside the public point:
 
     TLV_SIGNATURE_TEMPLATE (0xA0)
       TLV_PUB_KEY  <KEY_PUB_SIZE bytes, uncompressed point>
       <DER ECDSA signature>
 
-Convenient: the public point needed for fingerprint derivation arrives
-with the signature.
+`fixS` applies low-S normalisation (BIP-62). Valid ECDSA; harmless for
+OpenPGP, but the card will never emit a high-S signature.
 
-## EXPORT KEY
+In practice the Python SDK parses the TLV and returns `r` and `s` already
+split, so no DER decoding is needed on that path. A C helper
+(`ecdsa_der.c`) is included for clients that talk APDUs directly.
 
-    INS_EXPORT_KEY = 0xC2
-    EXPORT_KEY_P2_PUBLIC_ONLY      = 0x01
-    EXPORT_KEY_P2_EXTENDED_PUBLIC  = 0x02
+## Open questions for the Keycard team
 
-- Public-only export exists, addressable by BIP-32 derivation path.
-- Requires an open secure channel and a verified PIN (1093).
-
-Sufficient to derive a PGP fingerprint and an Ethereum address from the
-same point.
-
-## Curve coverage
+### Is Ed25519 planned?
 
 `SECP256k1.signHash` dispatches on algorithm:
 
@@ -75,50 +105,54 @@ same point.
     SIGN_ED25519        throws SW_FUNC_NOT_SUPPORTED
     SIGN_BLS12_381      throws SW_FUNC_NOT_SUPPORTED
 
-secp256k1 only in practice. Ed25519 is present in the dispatch but
+secp256k1 only in practice; Ed25519 is present in the dispatch but
 unimplemented.
 
-Implication: users cannot bring an existing OpenPGP identity. Most
-modern PGP keys are Ed25519 or RSA. Any key used here must be newly
-generated on secp256k1, which GnuPG and OpenPGP.js both reject by
-default today.
+This is the largest practical limitation. Users cannot bring an existing
+OpenPGP identity — most modern PGP keys are Ed25519 or RSA. Any key used
+here must be newly generated on secp256k1, which GnuPG and OpenPGP.js
+both reject by default today.
 
-Open question for the Keycard team: is Ed25519 planned, or deliberately
-excluded?
+### Would a monotonic SIGN counter be considered?
 
-## No signature counter
+The applet has no count of signing operations. The only counters present
+are `SecureChannelV2.nonceCounter` (AES-CCM nonce, transient) and the
+PIN / PUK remaining-tries counters.
 
-Searched the applet for any monotonic signing counter. The only counters
-present are:
+OpenPGP cards maintain a signature counter by specification. The SAMA5D3
+trusted-display prototype uses it as hardware-side evidence that a
+rejected request never invoked the key: the counter holds at N on reject
+and moves to N+1 on approve. That evidence comes from the card itself
+rather than from the application's own logs.
 
-- `SecureChannelV2.nonceCounter` — AES-CCM nonce, transient
-- PIN / PUK remaining-tries counters
-
-There is no count of signing operations.
-
-This is the one genuine regression versus NeoPGP. OpenPGP cards maintain
-a signature counter by specification. The current SAMA5D3 demo uses it as
-hardware-side evidence that the REJECT path never invoked the key: the
-counter holds at N on reject and moves to N+1 on approve. That evidence
-comes from the card itself rather than from the application's own logs.
-
-On the Keycard applet this property is unavailable. Absence of output on
-the reject path is weaker: it shows nothing was returned, not that the
+On the Keycard applet the property is unavailable. Absence of output on
+the reject path is weaker — it shows nothing was returned, not that the
 key was never exercised.
 
-Open question for the Keycard team: would a monotonic counter incremented
-on SIGN be considered? It is a small addition compared to shipping an
-OpenPGP applet, and it is what makes the approval guarantee externally
-verifiable.
+A monotonic counter incremented on SIGN is a small addition compared to
+shipping an OpenPGP applet, and it is what makes the approval guarantee
+externally verifiable.
 
-## Conclusion
+### Which cards are used for 4.0 development?
 
-The applet-free path is viable. The signing and export primitives are
-already correct for OpenPGP. What remains is a product decision on curve
-coverage, and a question about whether hardware-side proof of
-non-signing is worth a small applet change.
+See the appendix: a self-flashed 4.0 card was not achievable on the
+JavaCard generation tested here.
 
-## Hardware check: retail Keycard in the field
+## Supporting validation
+
+`openpgp_v4_build_public_key_body` was checked against a known-good key
+(the NeoPGP secp256k1 signing key, fingerprint `31CE69D6...`). The
+constructed body matches `gpg --export` byte for byte, and the derived
+fingerprint matches.
+
+DER-to-raw ECDSA conversion is covered by 14 tests including high-bit
+leading zeros, short values needing left-padding, and malformed input.
+
+---
+
+# Appendix: the installed base is split
+
+## Retail cards cannot be updated
 
 Read-only SELECT against a retail Keycard (identifiers withheld):
 
@@ -127,26 +161,18 @@ Read-only SELECT against a retail Keycard (identifiers withheld):
     capabilities     SECURE_CHANNEL | KEY_MANAGEMENT |
                      CREDENTIALS_MANAGEMENT | NDEF
 
-The applet source reviewed above is newer than what is on this card.
-Several current features are gated on applet >= 4.0 (e.g. BIP85 export),
-and Secure Channel V2 postdates this version.
-
-Implication for "ship to all existing holders": cards in the field are
-not necessarily on the current applet. Shell-side PGP logic would need to
-target the older command set, or adoption depends on holders updating.
-
-Open question for the Keycard team: can the applet be updated in place on
-an initialized card, or does it require a reinstall that clears keys?
-
-## Applet updates are not possible on retail cards
-
 Retail Keycards ship with randomised ISD keys. The official build guide
-notes that retaining those keys is what preserves the ability to reinstall
-or update the applet; retail holders do not have them. Applet install
-instructions are explicitly scoped to development cards.
+notes that retaining those keys is what preserves the ability to
+reinstall or update the applet; retail holders do not have them. Applet
+install instructions are explicitly scoped to development cards.
 
-Consequence: the 3.1 card tested above cannot be moved to a newer applet.
-It stays 3.1 for its lifetime.
+Consequence: this card stays on 3.1 for its lifetime.
+
+Incidental observation: this card's pairing secret was still the
+published default (`KeycardDefaultPairing`). Pairing alone does not
+expose keys — PIN verification is still required for SIGN and EXPORT KEY
+— but it is worth knowing that cards in the field may not have had it
+changed.
 
 ## Applet 4.0 splits the field (needs confirmation)
 
@@ -165,7 +191,7 @@ Because locked cards are immutable, 3.x cards in the field remain 3.x
 indefinitely. Any client must speak both protocols for as long as both
 generations exist.
 
-NOT YET CONFIRMED with the Keycard team. Source is a downstream project's
+NOT CONFIRMED with the Keycard team. Source is a downstream project's
 issue tracker, not official documentation.
 
 Implication for "ship PGP to all existing Keycard holders": the installed
@@ -174,13 +200,18 @@ protocols. Shell-side PGP logic would need to be dual-stack, or target
 one generation and exclude the other.
 
 Also noted: on 4.0, self-flashed development cards whose certificate does
-not chain to the known CA are rejected at SELECT by the standard SDK.
-Relevant to any plan that involves a self-built research card.
+not chain to the known CA are reportedly rejected at SELECT by the
+standard SDK.
 
 ## Self-flashing a research card: 4.0 fails, 3.2 works
 
-Target: blank NXP JavaCard (ex-PhononDAO), GlobalPlatform default ISD keys,
-OP_READY, installed with GlobalPlatformPro over PC/SC.
+Target: blank NXP JavaCard from a PhononDAO batch, GlobalPlatform default
+ISD keys, OP_READY, JavaCard 3.0.4 per CPLC. Installed with
+GlobalPlatformPro over PC/SC.
+
+This card has never held another applet. A sibling card from the same
+batch runs NeoPGP; both report an identical ATR
+(`3b:dc:18:ff:81:91:fe:1f:c3:80:73:c8:21:13:66:05:03:63:51:00:02:50`).
 
 Applet 4.0:
 
@@ -188,10 +219,10 @@ Applet 4.0:
 - it imports `A0000008040002` (`im.status.keycard.math`), which is NOT
   shipped with the release. It comes from the `keycard-math` git
   submodule, so the repo must be cloned with `--recurse-submodules`.
-  Without it, LOAD fails with 0x6438 (imported package not available)
+  Without it, LOAD fails with `0x6438` (imported package not available)
 - with the math package loaded first via `--load`, the Keycard package
-  loads cleanly, but instantiating `A000000804000101` fails with
-  0x6985 (conditions of use not satisfied)
+  loads cleanly, but instantiating `A000000804000101` fails with `0x6985`
+  (conditions of use not satisfied)
 - `IdentApplet` (`A000000804000104`) from the same package instantiates
   without error on the same card in the same session
 
@@ -200,14 +231,15 @@ Applet 3.2:
 - no `keycard-math` import
 - installs and instantiates on the same card without issue
 - SELECT returns the uninitialized shape: version 0.0, null instance and
-  key UID, capabilities SECURE_CHANNEL | CREDENTIALS_MANAGEMENT
+  key UID, capabilities `SECURE_CHANNEL | CREDENTIALS_MANAGEMENT`
 
 Reading: the 4.0 failure is isolated to the Keycard applet's constructor,
 not to loading, privileges or install parameters. The README requires
 JavaCard 3.0.5 and names `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY` as the
 3.0.5-specific requirement; Secure Channel V2 uses ECDHE on secp256k1.
-This card generation runs applets targeting 3.0.4 (it previously ran
-NeoPGP) but appears to lack what 4.0 needs.
+That algorithm is reported as supported by only a small minority of cards
+in the public JCAlgTest database. This card generation appears to lack
+it, but that has not been confirmed directly.
 
 Consequences:
 
@@ -215,53 +247,4 @@ Consequences:
   necessarily sufficient for current Keycard
 - the self-flashing path for 4.0 has an undocumented prerequisite (the
   math package from a submodule). Shipping it alongside the release cap,
-  or noting it in the release, would save others the 0x6438
-
-## End-to-end proof: OpenPGP identity from an unmodified retail Keycard
-
-Hardware: retail Keycard, applet 3.1, no applet changes of any kind.
-Host: macOS, OMNIKEY reader, Python keycard SDK 0.3.0 over PC/SC.
-
-Steps:
-
-1. SELECT, open Secure Channel V1 with an existing pairing, VERIFY PIN
-2. EXPORT KEY (public only) at `m/44'/60'/0'/0/0` -> 65-byte uncompressed
-   SEC1 point
-3. build a v4 public-key packet body from that point with a fixed
-   creation time
-4. derive the fingerprint: A1265C689EC7C60018C0AFB023A92D87D63F7E7C
-5. build the certification preimage over key body + UID `keycard-test`
-6. SIGN the 32-byte digest on the card
-7. assemble public-key + UID + signature packets
-8. import into a scratch GnuPG keyring
-
-Result:
-
-    pub   secp256k1 [SCA]
-          A1265C689EC7C60018C0AFB023A92D87D63F7E7C
-    uid           keycard-test
-    sig!3        23A92D87D63F7E7C  [self-signature]
-
-    gpg: 1 good signature
-
-`sig!3` means GnuPG verified the signature cryptographically.
-
-Notes:
-
-- the Python SDK returns r and s already split, so DER decoding is not
-  needed on that path (the C helper remains for direct APDU clients)
-- the signature result also returns the public point, matching EXPORT KEY
-- EXPORT KEY and SIGN both used make_current=False; no persistent card
-  state was changed
-- the creation time is part of the fingerprint preimage. It must be a
-  deliberate, fixed choice: changing it changes the key's identity
-
-## Supporting validation
-
-`openpgp_v4_build_public_key_body` was checked against a known-good key
-(the NeoPGP secp256k1 signing key, fingerprint 31CE69D6...). The
-constructed body matches `gpg --export` byte for byte, and the derived
-fingerprint matches.
-
-DER-to-raw ECDSA conversion covered by 14 tests including high-bit
-leading zeros, short values needing left-padding, and malformed input.
+  or noting it in the release, would save others the `0x6438`

@@ -1,7 +1,7 @@
 # Keycard as an OpenPGP backend: summary for the Keycard team
 
-A short version of `KEYCARD_APPLET_FINDINGS.md`,
-covering only what needs a decision.
+A short version of `KEYCARD_APPLET_FINDINGS.md`, covering only what needs
+a decision.
 
 ## In short
 
@@ -14,7 +14,9 @@ covering only what needs a decision.
   approval guarantee becomes an assertion rather than something the card
   demonstrates.
 - **One ask:** a monotonic counter incremented on SIGN.
-- **One question:** is Ed25519 planned?
+- **One question, and it is load-bearing:** is Ed25519 planned? Without
+  a curve the ecosystem already accepts, the identities this produces
+  are verifiable only by people who reconfigure their tooling.
 - **One decision:** whether Shell routes on applet type, supporting both the
   Keycard applet and an OpenPGP applet on a user-supplied card.
 
@@ -69,10 +71,28 @@ guarantee checkable from outside — useful for any Shell flow, not only PGP.
 ## Ed25519
 
 `signHash` has `SIGN_ED25519` in the dispatch but it throws
-`SW_FUNC_NOT_SUPPORTED`. With derivation as the only path, new keys are the
-only option regardless, so the curve mainly affects whether GnuPG and
-OpenPGP.js accept the result without configuration changes. Both reject
-secp256k1 by default today.
+`SW_FUNC_NOT_SUPPORTED`.
+
+This matters more than it first appears. Derivation means new keys
+regardless, so the curve is not a migration question — it is an acceptance
+question. `gpg-card` refuses secp256k1 from its allowlist; OpenPGP.js
+rejects it unless `rejectCurves` is cleared. Neither is an oversight.
+secp256k1 has no standing in the OpenPGP specifications, and those
+rejections are considered positions.
+
+The consequence is an identity that is cryptographically sound but
+socially awkward: verifiable by anyone who reconfigures their tooling,
+invisible to everyone who does not. For a key whose entire value comes
+from other people trusting it, that is a weak foundation.
+
+Two ways this resolves. Either the applet supports a curve the ecosystem
+already accepts, or the identity draws its legitimacy from somewhere other
+than PGP convention — an Ethereum binding, an attestation layer. The
+second is possible but means building trust infrastructure rather than
+inheriting it.
+
+Everything demonstrated here is curve-agnostic. The same code path works
+unchanged the day Ed25519 lands.
 
 **Question:** is Ed25519 planned, or deliberately out of scope?
 
@@ -110,5 +130,5 @@ air-gapped signing interface rather than a wallet with a PGP feature.
 
 ## Full detail
 
-`KEYCARD_APPLET_FINDINGS.md`, plus the scripts and
-C helpers in that directory.
+`KEYCARD_APPLET_FINDINGS.md`, plus the scripts and C helpers in this
+directory.

@@ -66,9 +66,11 @@
 
 ---
 
-# Planned PR — OpenPGP Request Protocol
+# PR #226 — OpenPGP Request Protocol
 
 **Branch:** `feature/openpgp-integration`
+
+**PR:** https://github.com/keycard-tech/keycard-shell/pull/226
 
 `████████████████████████████████  100% ✅ CODE COMPLETE`
 
@@ -125,11 +127,36 @@ Host may NOT provide:
 - [x] host-tested
 - [x] firmware-tested
 - [x] frozen checkpoint at `8b5a6d2`
-- [ ] branch pushed
-- [ ] PR opened
+- [x] branch pushed
+- [x] Draft PR #226 open
+- [x] dependency on PR #225 documented
+- [ ] rebase onto `master` after #225 lands
 - [ ] reviewed / merged
 
-**Next:** Push the branch and open a focused request-protocol PR.
+## Dependency
+
+**Depends on PR #225.**
+
+PR #226 is stacked on top of the OpenPGP certification primitives in PR #225:
+
+https://github.com/keycard-tech/keycard-shell/pull/225
+
+Until #225 is merged, GitHub's comparison for #226 also includes the two prerequisite commits from #225.
+
+While #225 is still unmerged, GitHub currently shows:
+
+- 4 commits
+- 7 files changed
+- 1,178 additions
+
+The protocol-specific delta remains:
+
+- `23b4eb6` — `openpgp: add versioned identity request protocol`
+- `8b5a6d2` — `openpgp: carry creation time in identity requests`
+- 3 files changed
+- 160 insertions
+
+After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so #226 shows only the protocol-specific changes.
 
 
 ---
@@ -377,8 +404,8 @@ OpenPGP gets a dedicated, purpose-specific action.
     23b4eb6
     8b5a6d2
        |
-       +-- CODE COMPLETE ✅
-       |   PR NOT OPEN YET
+       +-- PR #226 DRAFT OPEN ✅
+       |   DEPENDS ON PR #225
        |
        v
     feature/openpgp-orchestration
@@ -435,9 +462,9 @@ OpenPGP gets a dedicated, purpose-specific action.
     ████████████████████████████████ 100% ✅
     Draft PR OPEN
 
-    Planned PR — Request protocol
+    PR #226 — OpenPGP request protocol
     ████████████████████████████████ 100% ✅
-    CODE COMPLETE / PR NOT OPEN
+    DRAFT PR OPEN / DEPENDS ON #225
 
     Planned PR — Identity orchestration
     ████████████████░░░░░░░░░░░░░░  50% 🟡

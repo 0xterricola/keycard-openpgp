@@ -1,6 +1,6 @@
 # Keycard as an OpenPGP backend: summary for the Keycard team
 
-A short version of `experiments/keycard-applet/KEYCARD_APPLET_FINDINGS.md`,
+A short version of `KEYCARD_APPLET_FINDINGS.md`,
 covering only what needs a decision.
 
 ## In short
@@ -110,5 +110,5 @@ air-gapped signing interface rather than a wallet with a PGP feature.
 
 ## Full detail
 
-`experiments/keycard-applet/KEYCARD_APPLET_FINDINGS.md`, plus the scripts and
+`KEYCARD_APPLET_FINDINGS.md`, plus the scripts and
 C helpers in that directory.

@@ -117,3 +117,102 @@ The applet-free path is viable. The signing and export primitives are
 already correct for OpenPGP. What remains is a product decision on curve
 coverage, and a question about whether hardware-side proof of
 non-signing is worth a small applet change.
+
+## Hardware check: retail Keycard in the field
+
+Read-only SELECT against a retail Keycard (identifiers withheld):
+
+    applet version   3.1
+    initialized      true
+    capabilities     SECURE_CHANNEL | KEY_MANAGEMENT |
+                     CREDENTIALS_MANAGEMENT | NDEF
+
+The applet source reviewed above is newer than what is on this card.
+Several current features are gated on applet >= 4.0 (e.g. BIP85 export),
+and Secure Channel V2 postdates this version.
+
+Implication for "ship to all existing holders": cards in the field are
+not necessarily on the current applet. Shell-side PGP logic would need to
+target the older command set, or adoption depends on holders updating.
+
+Open question for the Keycard team: can the applet be updated in place on
+an initialized card, or does it require a reinstall that clears keys?
+
+## Applet updates are not possible on retail cards
+
+Retail Keycards ship with randomised ISD keys. The official build guide
+notes that retaining those keys is what preserves the ability to reinstall
+or update the applet; retail holders do not have them. Applet install
+instructions are explicitly scoped to development cards.
+
+Consequence: the 3.1 card tested above cannot be moved to a newer applet.
+It stays 3.1 for its lifetime.
+
+## Applet 4.0 splits the field (needs confirmation)
+
+Per a third-party project tracking Keycard SDK changes (keycard-pal
+issue #304), applet 4.0 was tagged 2026-09-14 and:
+
+- replaces the pairing-based secure channel with a pairing-less,
+  certificate-authenticated one
+- removes PAIR, UNPAIR, MUTUALLY AUTHENTICATE, IDENTIFY CARD
+- changes the shape of the SELECT response
+- Secure Channel V2 uses ephemeral ECDH and AES-CCM, with the card
+  authenticating itself by signing the handshake transcript against a
+  CA-certified key
+
+Because locked cards are immutable, 3.x cards in the field remain 3.x
+indefinitely. Any client must speak both protocols for as long as both
+generations exist.
+
+NOT YET CONFIRMED with the Keycard team. Source is a downstream project's
+issue tracker, not official documentation.
+
+Implication for "ship PGP to all existing Keycard holders": the installed
+base is permanently split across two incompatible secure-channel
+protocols. Shell-side PGP logic would need to be dual-stack, or target
+one generation and exclude the other.
+
+Also noted: on 4.0, self-flashed development cards whose certificate does
+not chain to the known CA are rejected at SELECT by the standard SDK.
+Relevant to any plan that involves a self-built research card.
+
+## Self-flashing a research card: 4.0 fails, 3.2 works
+
+Target: blank NXP JavaCard (ex-PhononDAO), GlobalPlatform default ISD keys,
+OP_READY, installed with GlobalPlatformPro over PC/SC.
+
+Applet 4.0:
+
+- the release cap bundles four applets; `--install` requires naming one
+- it imports `A0000008040002` (`im.status.keycard.math`), which is NOT
+  shipped with the release. It comes from the `keycard-math` git
+  submodule, so the repo must be cloned with `--recurse-submodules`.
+  Without it, LOAD fails with 0x6438 (imported package not available)
+- with the math package loaded first via `--load`, the Keycard package
+  loads cleanly, but instantiating `A000000804000101` fails with
+  0x6985 (conditions of use not satisfied)
+- `IdentApplet` (`A000000804000104`) from the same package instantiates
+  without error on the same card in the same session
+
+Applet 3.2:
+
+- no `keycard-math` import
+- installs and instantiates on the same card without issue
+- SELECT returns the uninitialized shape: version 0.0, null instance and
+  key UID, capabilities SECURE_CHANNEL | CREDENTIALS_MANAGEMENT
+
+Reading: the 4.0 failure is isolated to the Keycard applet's constructor,
+not to loading, privileges or install parameters. The README requires
+JavaCard 3.0.5 and names `KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY` as the
+3.0.5-specific requirement; Secure Channel V2 uses ECDHE on secp256k1.
+This card generation runs applets targeting 3.0.4 (it previously ran
+NeoPGP) but appears to lack what 4.0 needs.
+
+Consequences:
+
+- a JavaCard generation sufficient for an OpenPGP applet is not
+  necessarily sufficient for current Keycard
+- the self-flashing path for 4.0 has an undocumented prerequisite (the
+  math package from a submodule). Shipping it alongside the release cap,
+  or noting it in the release, would save others the 0x6438

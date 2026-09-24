@@ -10,3 +10,5 @@ neopgp/
 
 # macOS
 .DS_Store
+experiments/keycard-applet/.venv/
+experiments/keycard-applet/*.cap

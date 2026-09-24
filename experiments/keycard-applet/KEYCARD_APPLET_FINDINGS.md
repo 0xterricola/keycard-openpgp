@@ -216,3 +216,52 @@ Consequences:
 - the self-flashing path for 4.0 has an undocumented prerequisite (the
   math package from a submodule). Shipping it alongside the release cap,
   or noting it in the release, would save others the 0x6438
+
+## End-to-end proof: OpenPGP identity from an unmodified retail Keycard
+
+Hardware: retail Keycard, applet 3.1, no applet changes of any kind.
+Host: macOS, OMNIKEY reader, Python keycard SDK 0.3.0 over PC/SC.
+
+Steps:
+
+1. SELECT, open Secure Channel V1 with an existing pairing, VERIFY PIN
+2. EXPORT KEY (public only) at `m/44'/60'/0'/0/0` -> 65-byte uncompressed
+   SEC1 point
+3. build a v4 public-key packet body from that point with a fixed
+   creation time
+4. derive the fingerprint: A1265C689EC7C60018C0AFB023A92D87D63F7E7C
+5. build the certification preimage over key body + UID `keycard-test`
+6. SIGN the 32-byte digest on the card
+7. assemble public-key + UID + signature packets
+8. import into a scratch GnuPG keyring
+
+Result:
+
+    pub   secp256k1 [SCA]
+          A1265C689EC7C60018C0AFB023A92D87D63F7E7C
+    uid           keycard-test
+    sig!3        23A92D87D63F7E7C  [self-signature]
+
+    gpg: 1 good signature
+
+`sig!3` means GnuPG verified the signature cryptographically.
+
+Notes:
+
+- the Python SDK returns r and s already split, so DER decoding is not
+  needed on that path (the C helper remains for direct APDU clients)
+- the signature result also returns the public point, matching EXPORT KEY
+- EXPORT KEY and SIGN both used make_current=False; no persistent card
+  state was changed
+- the creation time is part of the fingerprint preimage. It must be a
+  deliberate, fixed choice: changing it changes the key's identity
+
+## Supporting validation
+
+`openpgp_v4_build_public_key_body` was checked against a known-good key
+(the NeoPGP secp256k1 signing key, fingerprint 31CE69D6...). The
+constructed body matches `gpg --export` byte for byte, and the derived
+fingerprint matches.
+
+DER-to-raw ECDSA conversion covered by 14 tests including high-bit
+leading zeros, short values needing left-padding, and malformed input.

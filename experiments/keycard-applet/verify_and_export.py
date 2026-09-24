@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Export a public key and sign a supplied digest on a Keycard.
+Verify PIN and export a public key.
 
-Card state changes: none, except the PIN retry counter if the PIN is wrong.
-Both export and sign use make_current=False.
+Prompts for the PIN so it is not stored in shell history.
+The only state change is the PIN retry counter, and only if the PIN is wrong.
 
 Usage:
-    python3 card_export_and_sign.py <index> <pairing_key_hex> <path> <digest_hex>
+    python3 verify_and_export.py <index> <pairing_key_hex> <path>
 """
 
 import getpass
@@ -17,18 +17,13 @@ from keycard.constants import DerivationOption
 
 
 def main():
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 4:
         print(__doc__)
         sys.exit(2)
 
     index = int(sys.argv[1])
     key = bytes.fromhex(sys.argv[2])
     path = sys.argv[3]
-    digest = bytes.fromhex(sys.argv[4])
-
-    if len(digest) != 32:
-        print(f"digest must be 32 bytes, got {len(digest)}")
-        sys.exit(2)
 
     card = KeyCard()
     info = card.select()
@@ -37,10 +32,15 @@ def main():
     card.open_secure_channel(index, key)
     print("secure channel open")
 
+    print(f"pin retries before: {card.status['pin_retry_count']}")
+
     pin = getpass.getpass("PIN: ")
+
     if not pin.isdigit():
-        print("PIN must be digits. Nothing sent.")
+        print("PIN must be digits only. Nothing sent to the card.")
         sys.exit(2)
+
+    print(f"(sending {len(pin)} digits)")
 
     if not card.verify_pin(pin):
         print("PIN REJECTED")
@@ -57,13 +57,8 @@ def main():
     )
 
     print()
-    print(f"PATH   {path}")
-    print(f"POINT  {exported.public_key.hex()}")
-
-    result = card.sign_with_path(digest, path, make_current=False)
-
-    print(f"R      {result.r.hex()}")
-    print(f"S      {result.s.hex()}")
+    print(f"path: {path}")
+    print(f"exported: {exported}")
 
 
 if __name__ == "__main__":

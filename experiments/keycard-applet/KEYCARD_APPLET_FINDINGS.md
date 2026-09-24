@@ -138,6 +138,75 @@ externally verifiable.
 See the appendix: a self-flashed 4.0 card was not achievable on the
 JavaCard generation tested here.
 
+## Importing an existing PGP key is not possible
+
+`LOAD KEY` (`INS_LOAD_KEY = 0xD0`) accepts four forms: EC keypair,
+extended EC keypair, BIP-32 seed, LEE seed.
+
+`loadKeyPair` writes `masterPrivate.setS(...)` and `masterPublic.setW(...)`
+inside a transaction, then regenerates the key UID from `masterPublic`.
+There is one master key on the card; loading replaces it. When no public
+key is supplied, the applet derives one with `secp256k1.derivePublicKey`,
+so the loaded key is secp256k1 regardless.
+
+Consequences:
+
+- a user cannot bring an existing OpenPGP key onto a Keycard. Loading one
+  would overwrite the wallet master and destroy the wallet keys.
+- Shell cannot work around this. The applet has a single master key slot;
+  there is nothing to partition.
+- Ed25519 support alone would not change this. The obstacle is the key
+  model, not only the curve.
+
+The viable path is derivation, not import: a PGP identity derived from
+the card's existing master at a chosen BIP-32 path. This is what the
+end-to-end proof above does. It coexists with the wallet, requires no
+applet change, and is reproducible from the seed, which also gives a
+recovery story.
+
+Implication for the product story: not "use your existing PGP key on a
+Keycard" but "derive a hardware-backed PGP identity from your Keycard".
+That is a new key with a new fingerprint, which a user would need to
+cross-sign from an existing identity to carry over any trust.
+
+## Two backends, one interface
+
+The constraints above argue for supporting two card backends rather than
+choosing between them.
+
+**Keycard applet.** Works on cards people already own, no install, no
+applet change. Identity is derived from the existing master, so the
+wallet is untouched. Limited to secp256k1, and there is no signature
+counter.
+
+**An OpenPGP applet on a user-supplied card.** Full OpenPGP semantics,
+including the signature counter and whatever curves the applet supports.
+Costs the user a card and a flashing step.
+
+These are not exclusive. SELECT identifies which applet is present before
+any secure channel, PIN or pairing, so routing costs nothing and happens
+on the first APDU of a tap.
+
+The existing code is already shaped for this. `openpgp_v4.c` consumes and
+produces byte arrays with no knowledge of the card; the card dependency
+is confined to a four-function interface (`neopgp_sign.h`). The Keycard
+path demonstrated above is a second implementation behind that same
+boundary.
+
+Costs to weigh:
+
+- two secure-channel implementations in firmware (Keycard's pairing-based
+  channel, plus whatever the OpenPGP applet requires)
+- two sets of failure modes to surface on a constrained UI
+
+Open design question: the two backends do not offer the same guarantees.
+One can prove from the card that a rejected request never invoked the
+key; the other cannot. A guarantee that silently varies by card is the
+same two-tier problem this project exists to avoid, so the trusted
+display should probably state which mode it is operating in.
+
+---
+
 ## Supporting validation
 
 `openpgp_v4_build_public_key_body` was checked against a known-good key
@@ -147,8 +216,6 @@ fingerprint matches.
 
 DER-to-raw ECDSA conversion is covered by 14 tests including high-bit
 leading zeros, short values needing left-padding, and malformed input.
-
----
 
 # Appendix: the installed base is split
 
@@ -249,100 +316,3 @@ Consequences:
   math package from a submodule). Shipping it alongside the release cap,
   or noting it in the release, would save others the `0x6438`
 
-## Importing an existing PGP key is not possible
-
-`LOAD KEY` (`INS_LOAD_KEY = 0xD0`) accepts four forms: EC keypair,
-extended EC keypair, BIP-32 seed, LEE seed.
-
-`loadKeyPair` writes `masterPrivate.setS(...)` and `masterPublic.setW(...)`
-inside a transaction, then regenerates the key UID from `masterPublic`.
-There is one master key on the card; loading replaces it. When no public
-key is supplied, the applet derives one with `secp256k1.derivePublicKey`,
-so the loaded key is secp256k1 regardless.
-
-Consequences:
-
-- a user cannot bring an existing OpenPGP key onto a Keycard. Loading one
-  would overwrite the wallet master and destroy the wallet keys.
-- Shell cannot work around this. The applet has a single master key slot;
-  there is nothing to partition.
-- Ed25519 support alone would not change this. The obstacle is the key
-  model, not only the curve.
-
-The viable path is derivation, not import: a PGP identity derived from
-the card's existing master at a chosen BIP-32 path. This is what the
-end-to-end proof above does. It coexists with the wallet, requires no
-applet change, and is reproducible from the seed — which also gives a
-recovery story.
-
-Implication for the product story: not "use your existing PGP key on a
-Keycard" but "derive a hardware-backed PGP identity from your Keycard".
-That is a new key with a new fingerprint, which a user would need to
-cross-sign from an existing identity to carry over any trust.
-
-## Importing an existing PGP key is not possible
-
-`LOAD KEY` (`INS_LOAD_KEY = 0xD0`) accepts four forms: EC keypair,
-extended EC keypair, BIP-32 seed, LEE seed.
-
-`loadKeyPair` writes `masterPrivate.setS(...)` and `masterPublic.setW(...)`
-inside a transaction, then regenerates the key UID from `masterPublic`.
-There is one master key on the card; loading replaces it. When no public
-key is supplied, the applet derives one with `secp256k1.derivePublicKey`,
-so the loaded key is secp256k1 regardless.
-
-Consequences:
-
-- a user cannot bring an existing OpenPGP key onto a Keycard. Loading one
-  would overwrite the wallet master and destroy the wallet keys.
-- Shell cannot work around this. The applet has a single master key slot;
-  there is nothing to partition.
-- Ed25519 support alone would not change this. The obstacle is the key
-  model, not only the curve.
-
-The viable path is derivation, not import: a PGP identity derived from
-the card's existing master at a chosen BIP-32 path. This is what the
-end-to-end proof above does. It coexists with the wallet, requires no
-applet change, and is reproducible from the seed, which also gives a
-recovery story.
-
-Implication for the product story: not "use your existing PGP key on a
-Keycard" but "derive a hardware-backed PGP identity from your Keycard".
-That is a new key with a new fingerprint, which a user would need to
-cross-sign from an existing identity to carry over any trust.
-
-## Two backends, one interface
-
-The constraints above argue for supporting two card backends rather than
-choosing between them.
-
-**Keycard applet.** Works on cards people already own, no install, no
-applet change. Identity is derived from the existing master, so the
-wallet is untouched. Limited to secp256k1, and there is no signature
-counter.
-
-**An OpenPGP applet on a user-supplied card.** Full OpenPGP semantics,
-including the signature counter and whatever curves the applet supports.
-Costs the user a card and a flashing step.
-
-These are not exclusive. SELECT identifies which applet is present before
-any secure channel, PIN or pairing, so routing costs nothing and happens
-on the first APDU of a tap.
-
-The existing code is already shaped for this. `openpgp_v4.c` consumes and
-produces byte arrays with no knowledge of the card; the card dependency
-is confined to a four-function interface (`neopgp_sign.h`). The Keycard
-path demonstrated above is a second implementation behind that same
-boundary.
-
-Costs to weigh:
-
-- two secure-channel implementations in firmware (Keycard's pairing-based
-  channel, plus whatever the OpenPGP applet requires)
-- two sets of failure modes to surface on a constrained UI
-
-Open design question: the two backends do not offer the same guarantees.
-One can prove from the card that a rejected request never invoked the
-key; the other cannot. A guarantee that silently varies by card is the
-same two-tier problem this project exists to avoid, so the trusted
-display should probably state which mode it is operating in.

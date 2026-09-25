@@ -275,7 +275,7 @@ The branch is pushed for backup, comparison, and review while the production der
 
 **Purpose:** Final Shell-owned OpenPGP derivation path
 
-`████████████░░░░░░░░░░░░░░░░░░░░  ~40% ⏳ BLOCKED ON GUIDANCE`
+`████████████████████████░░░░░░░░  ~75% 🟡 NAMESPACE GUIDANCE RECEIVED`
 
 ## Completed
 
@@ -289,12 +289,16 @@ The branch is pushed for backup, comparison, and review while the production der
 - [x] multisig already owns `m/43'/60'/1581'/0'/0`
 - [x] OpenPGP will not silently reuse the multisig identity path
 - [x] maintainer question sent
-- [x] orchestration remains path-agnostic until policy is decided
+- [x] maintainer proposed dedicated OpenPGP path namespace:
+  `m/43'/60'/1581'/5261136'/x`
+- [x] `5261136 = 0x504750 = "PGP"`
+- [x] orchestration remains path-agnostic until final child policy is decided
 
 ## Remaining
 
-- [ ] exact OpenPGP production namespace / key type / path
-- [ ] maintainer approval of reserved path
+- [x] dedicated OpenPGP production namespace proposed by maintainer
+- [ ] define the exact meaning / policy for final child `x`
+- [ ] confirm whether any additional Keycard key-type policy is required
 - [ ] define final path constants/helper
 - [ ] wire final policy into OpenPGP menu/action
 - [ ] document rationale
@@ -303,13 +307,18 @@ The branch is pushed for backup, comparison, and review while the production der
 
     openpgp: define identity derivation path
 
-## Current Blocker
+## Current Position
 
 The Shell-side cryptographic and QR plumbing is complete.
 
-The remaining policy question is which distinct Keycard / EIP-1581 path should be reserved for OpenPGP. Multisig already uses `m/43'/60'/1581'/0'/0`, so OpenPGP must not accidentally collide with that identity key.
+Maintainer namespace guidance has arrived: the maintainer proposed
+`m/43'/60'/1581'/5261136'/x`, where `5261136 = 0x504750 = "PGP"`.
 
-This blocks final menu wiring and physical E2E testing, but it does not require redesigning the completed orchestration APIs.
+The remaining policy work is to define the exact meaning of child `x` and confirm
+whether any additional Keycard key-type policy is required. After that, the path
+can be encoded as Shell-owned policy and wired into the OpenPGP menu/action.
+
+No redesign of the completed orchestration APIs is required.
 
 
 # Shell UI + QR Integration
@@ -428,7 +437,8 @@ Response:
 The host tooling is ready for the physical Shell test.
 
 It intentionally does not define or transmit the OpenPGP derivation path.
-That remains trusted Shell policy and is still blocked on maintainer guidance.
+That remains trusted Shell policy. Maintainer namespace guidance has now
+arrived; final child `x` and any additional key-policy details remain pending.
 
 
 ---
@@ -543,7 +553,8 @@ That remains trusted Shell policy and is still blocked on maintainer guidance.
        v
     derivation path policy
        |
-       +-- WAITING ON MAINTAINER ⏳
+       +-- NAMESPACE GUIDANCE RECEIVED ✅
+       +-- FINAL x POLICY PENDING ⏳
        |
        v
     menu wiring + physical E2E
@@ -587,7 +598,12 @@ That remains trusted Shell policy and is still blocked on maintainer guidance.
             ↓
     +------------------------------------+
     | PRODUCTION DERIVATION PATH         |
-    |      ← WE ARE HERE / BLOCKED       |
+    | namespace proposed / x pending      |
+    +------------------------------------+
+            ↓
+    +------------------------------------+
+    | FINAL CHILD POLICY                 |
+    |      ← WE ARE HERE                 |
     +------------------------------------+
             ↓
     OpenPGP menu/action                  ⬜
@@ -612,8 +628,8 @@ That remains trusted Shell policy and is still blocked on maintainer guidance.
     COMPLETE / BRANCH PUSHED / NO STANDALONE PR
 
     Derivation policy
-    ████████████░░░░░░░░░░░░░░░░░░░  40% ⏳
-    WAITING ON MAINTAINER
+    ████████████████████████░░░░░░░░  75% 🟡
+    PGP NAMESPACE PROPOSED / FINAL x POLICY PENDING
 
     Shell UI + QR integration
     ███████████████████████████░░░░░  85% 🟡
@@ -635,6 +651,8 @@ That remains trusted Shell policy and is still blocked on maintainer guidance.
 ## Next Checkbox
 
 - [x] host CREATE_IDENTITY request / response QR tooling
-- [ ] maintainer selects / approves the production OpenPGP derivation path
+- [x] maintainer proposes dedicated OpenPGP namespace
+  `m/43'/60'/1581'/5261136'/x`
+- [ ] define final child `x` policy and any required key-type policy
 - [ ] define that path in Shell and wire the OpenPGP menu/action
 - [ ] run the first physical Shell CREATE_IDENTITY E2E

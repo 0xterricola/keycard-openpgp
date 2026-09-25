@@ -2,7 +2,7 @@
 
 ## Overall Project
 
-`██████████████████████████░░░░░░  ~80%`
+`█████████████████████████████░░░  ~90%`
 
 ### Goal
 
@@ -58,7 +58,7 @@
 ## Status
 
 - [x] branch pushed
-- [x] Draft PR #225 open
+- [x] PR #225 open
 - [ ] review / merge pending
 
 **Scope:** Keep this PR focused on reusable OpenPGP primitives.
@@ -128,7 +128,7 @@ Host may NOT provide:
 - [x] firmware-tested
 - [x] frozen checkpoint at `8b5a6d2`
 - [x] branch pushed
-- [x] Draft PR #226 open
+- [x] PR #226 open
 - [x] dependency on PR #225 documented
 - [ ] rebase onto `master` after #225 lands
 - [ ] reviewed / merged
@@ -161,15 +161,19 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
 
 ---
 
-# OpenPGP Identity Orchestration
+# PR #227 — Trusted Identity Creation + Shell Integration
 
 **Branch:** `feature/openpgp-orchestration`
 
 **Remote:** `origin/feature/openpgp-orchestration`
 
-**Standalone PR:** not opened; branch is kept as a pushed checkpoint for now
+**PR:** https://github.com/keycard-tech/keycard-shell/pull/227
 
-`████████████████████████████████  100% ✅ CORE FLOW COMPLETE`
+**PR state:** ready for review
+
+**Current head:** `3c1f9f0`
+
+`████████████████████████████████  100% ✅ CODE COMPLETE`
 
 ## Completed Commits
 
@@ -182,6 +186,8 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
 - `9613b81` — `openpgp: assemble and verify identity`
 - `e50e282` — `openpgp: orchestrate identity creation`
 - `374fb31` — `openpgp: add dedicated QR identity flow`
+- `761ebc3` — `openpgp: define identity derivation path`
+- `3c1f9f0` — `openpgp: add identity menu action`
 
 ## Completed
 
@@ -210,10 +216,24 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
 - [x] verified certificate encoded as `UR:BYTES`
 - [x] response QR display
 - [x] generic `UR_ANY_TX` dispatch left unchanged
+- [x] Shell-owned OpenPGP derivation policy wrapper
+- [x] current implemented identity path `m/43'/60'/1581'/5261136'/0`
+- [x] host/request cannot select or override that path
+- [x] OpenPGP main-menu entry
+- [x] menu dispatch calls `core_openpgp_run()`
+- [x] UI/task layer does not receive derivation-path parameters
 
 ## Current Pipeline
 
-    Shell-selected trusted path              ✅
+    OpenPGP main-menu action                 ✅
+            ↓
+    Shell-owned derivation policy            ✅
+            ↓
+    m/43'/60'/1581'/5261136'/0              ✅
+            ↓
+    dedicated UR:BYTES request              ✅
+            ↓
+    UID + creation_time                     ✅
             ↓
     Keycard EXPORT KEY                      ✅
             ↓
@@ -222,8 +242,6 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
     OpenPGP primary-key body                ✅
             ↓
     OpenPGP fingerprint                     ✅
-            ↓
-    UID + creation_time                     ✅
             ↓
     certification digest                    ✅
             ↓
@@ -249,33 +267,51 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
 
 ## Verification Checkpoint
 
-- [x] `git diff --check` clean
-- [x] clean release build passes `385/385`
+- [x] `git diff --check` passed for derivation-policy changes
+- [x] release firmware built successfully after derivation-policy changes
+- [x] `git diff --check` passed for menu integration
+- [x] release firmware built successfully at `3c1f9f0`
+- [x] previous clean full release build reached `385/385`
 - [x] core task stack confirmed as 2048 × 32-bit = 8192 bytes
 - [x] `core_openpgp_create_identity_at_path()` frame: 680 bytes
 - [x] `core_openpgp_qr_run()` frame: 72 bytes
-- [x] branch pushed and tracking `origin/feature/openpgp-orchestration`
+- [x] branch pushed through `3c1f9f0`
+- [x] upstream PR #227 opened
+- [x] PR #227 marked ready for review
+- [x] PR #227 documents dependencies on #225 and #226
 
-## Remaining Outside Core Orchestration
+## Current Remaining Work
 
-- [ ] choose final Shell-owned production derivation path
-- [ ] add OpenPGP menu/action entry
-- [ ] bind menu action to approved path policy
-- [ ] physical Shell end-to-end test
+- [ ] maintainer confirmation of final child `x` semantics
+- [ ] confirm whether any additional Keycard key-type policy is required
+- [ ] receive a runnable firmware build containing PR #227
+- [ ] physical Shell CREATE_IDENTITY E2E
 - [ ] final GnuPG validation
+- [ ] fix any hardware-only UX / failure behavior discovered during E2E
 
-## PR Strategy
+## PR Stack Note
 
-No standalone orchestration PR is being opened at this checkpoint.
+PR #227 targets upstream `master` and is stacked on #225 and #226.
 
-The branch is pushed for backup, comparison, and review while the production derivation-path policy is resolved. After that decision, the remaining integration can be completed and folded into the existing OpenPGP PR stack.
+Because the prerequisite PRs are not yet merged, GitHub currently shows the full stacked history in #227 (15 commits). After the prerequisite PRs land and the stack is rebased/updated, the review diff can collapse to the orchestration / path-policy / menu-specific delta.
 
 
 # Derivation Policy
 
-**Purpose:** Final Shell-owned OpenPGP derivation path
+**Purpose:** Shell-owned OpenPGP derivation path
 
-`████████████████████████░░░░░░░░  ~75% 🟡 NAMESPACE GUIDANCE RECEIVED`
+`█████████████████████████████░░░  ~90% 🟡 IMPLEMENTED / FINAL CHILD SEMANTICS PENDING`
+
+## Current Implemented Policy
+
+    m/43'/60'/1581'/5261136'/0
+
+where:
+
+    5261136 = 0x504750 = "PGP"
+
+The final component is non-hardened. For the current implementation, child `0`
+is treated as the initial OpenPGP identity/key index.
 
 ## Completed
 
@@ -284,46 +320,45 @@ The branch is pushed for backup, comparison, and review while the production der
 - [x] SLIP-0013 investigated
 - [x] SLIP-0017 investigated
 - [x] ERC-1581 / Keycard namespace investigated
-- [x] path decision isolated from orchestration plumbing
 - [x] existing multisig EIP-1581 path identified
 - [x] multisig already owns `m/43'/60'/1581'/0'/0`
-- [x] OpenPGP will not silently reuse the multisig identity path
-- [x] maintainer question sent
-- [x] maintainer proposed dedicated OpenPGP path namespace:
+- [x] OpenPGP does not silently reuse the multisig identity path
+- [x] maintainer proposed dedicated OpenPGP namespace:
   `m/43'/60'/1581'/5261136'/x`
 - [x] `5261136 = 0x504750 = "PGP"`
-- [x] orchestration remains path-agnostic until final child policy is decided
+- [x] current implementation chooses `x = 0` for the initial identity
+- [x] path constants encoded in Shell
+- [x] no-argument `core_openpgp_run()` owns the production policy boundary
+- [x] menu/action binds to the Shell-owned policy
+- [x] path remains absent from the host request protocol
+- [x] implementation isolated so the final child policy can change without redesigning orchestration
+- [x] implementation commit: `761ebc3` — `openpgp: define identity derivation path`
 
 ## Remaining
 
-- [x] dedicated OpenPGP production namespace proposed by maintainer
-- [ ] define the exact meaning / policy for final child `x`
+- [ ] maintainer confirms exact meaning / policy for final child `x`
 - [ ] confirm whether any additional Keycard key-type policy is required
-- [ ] define final path constants/helper
-- [ ] wire final policy into OpenPGP menu/action
-- [ ] document rationale
-
-## Expected Commit
-
-    openpgp: define identity derivation path
+- [ ] adjust the final child value/semantics if maintainer guidance differs from current `x = 0`
+- [ ] finalize documentation wording after confirmation
 
 ## Current Position
 
-The Shell-side cryptographic and QR plumbing is complete.
+The namespace question is resolved enough for implementation: OpenPGP has a
+dedicated EIP-1581 namespace proposed by the maintainer and Shell now encodes it.
 
-Maintainer namespace guidance has arrived: the maintainer proposed
-`m/43'/60'/1581'/5261136'/x`, where `5261136 = 0x504750 = "PGP"`.
+The only remaining policy uncertainty is the exact semantics of the final
+non-hardened child `x` (and whether any additional Keycard key-type policy is
+desired). The current code uses `x = 0` for the first identity and labels that
+interpretation as pending final maintainer confirmation.
 
-The remaining policy work is to define the exact meaning of child `x` and confirm
-whether any additional Keycard key-type policy is required. After that, the path
-can be encoded as Shell-owned policy and wired into the OpenPGP menu/action.
-
-No redesign of the completed orchestration APIs is required.
+This is no longer blocking the software vertical slice, menu wiring, or PR #227.
+If the maintainer requests a different child policy, the change is isolated to
+the Shell-owned policy layer.
 
 
 # Shell UI + QR Integration
 
-`███████████████████████████░░░░░  ~85% 🟡`
+`████████████████████████████████  100% ✅ CODE COMPLETE`
 
 ## Completed
 
@@ -346,21 +381,28 @@ No redesign of the completed orchestration APIs is required.
 - [x] display certificate response QR
 - [x] request/output heap aliasing handled safely
 - [x] generic transaction QR dispatch remains unchanged
+- [x] OpenPGP main-menu entry added
+- [x] main-menu dispatch wired to `core_openpgp_run()`
+- [x] action bound to Shell-owned derivation policy
+- [x] release build succeeds with the menu/action enabled
+- [x] menu integration commit: `3c1f9f0` — `openpgp: add identity menu action`
 
-## Remaining
+## Remaining Validation
 
-- [ ] add OpenPGP menu/action entry
-- [ ] bind action to final Shell-owned derivation path
-- [ ] add/confirm user-facing failure behavior during physical testing
+- [ ] confirm user-facing failure behavior on physical hardware
 - [ ] physical QR request/response test
+- [ ] confirm menu/action behavior on a runnable firmware build
 
 ## Security Rule
 
 Generic QR scanning must not accidentally turn arbitrary `UR:BYTES`
 payloads into OpenPGP signing requests.
 
-OpenPGP has a dedicated purpose-specific action and explicitly requests
+OpenPGP has a dedicated purpose-specific menu action and explicitly requests
 `BYTES`; the existing generic transaction QR dispatcher remains unchanged.
+
+The UI/task dispatcher invokes `core_openpgp_run()` without accepting a path,
+so the host and menu layer cannot select the Keycard derivation path.
 
 
 # Host E2E Tooling
@@ -437,15 +479,19 @@ Response:
 The host tooling is ready for the physical Shell test.
 
 It intentionally does not define or transmit the OpenPGP derivation path.
-That remains trusted Shell policy. Maintainer namespace guidance has now
-arrived; final child `x` and any additional key-policy details remain pending.
+That is now implemented as Shell-owned policy at
+`m/43'/60'/1581'/5261136'/0`, while final maintainer confirmation of the child
+`x` semantics remains pending.
+
+The host side is not the current blocker. Physical E2E is waiting on a runnable
+firmware build containing PR #227.
 
 
 ---
 
 # Final Device + GnuPG Validation
 
-`███████████░░░░░░░░░░░░░░░░░░░░░  ~35% ⬜`
+`███████████████░░░░░░░░░░░░░░░░░  ~45% ⬜ BLOCKED ON RUNNABLE FIRMWARE BUILD`
 
 ## Already Proven
 
@@ -459,15 +505,32 @@ arrived; final child `x` and any additional key-policy details remain pending.
 - [x] complete Shell-side identity construction path
 - [x] Shell-side certificate self-verification path
 - [x] dedicated Shell `UR:BYTES` identity handler builds
-- [x] repeated production firmware builds
-- [x] repeated test firmware builds
-- [x] clean full release build reaches `385/385`
+- [x] host CREATE_IDENTITY request generator implemented and QR round-trip verified
+- [x] host response decoder implemented and QR round-trip verified
+- [x] Shell-owned OpenPGP path policy implemented
+- [x] current policy uses `m/43'/60'/1581'/5261136'/0`
+- [x] OpenPGP main-menu action implemented
+- [x] menu action bound to `core_openpgp_run()`
+- [x] release firmware builds successfully with the complete software flow
+- [x] previous clean full release build reaches `385/385`
+- [x] upstream PR #227 opened and marked ready for review
+
+## Current Hardware Blocker
+
+A physical Shell E2E cannot be run from the locally built development-signed
+firmware on the available retail device.
+
+The physical test is waiting for the firmware developer to provide a runnable
+build containing PR #227 / `feature/openpgp-orchestration`.
+
+This build dependency is already understood; no additional firmware-flashing
+work is part of the OpenPGP implementation task right now.
 
 ## Final Shell E2E Still Required
 
-- [ ] finalize production derivation path
-- [ ] expose OpenPGP action in Shell menu
-- [x] host CREATE_IDENTITY request generator implemented and QR round-trip verified
+- [ ] maintainer confirms final child `x` semantics / any additional key-type policy
+- [ ] receive runnable firmware build containing PR #227
+- [ ] confirm OpenPGP main-menu entry on physical Shell
 - [ ] generate final physical-test CREATE_IDENTITY request
 - [ ] scan request with physical Shell
 - [ ] Shell derives physical Keycard public key
@@ -478,7 +541,6 @@ arrived; final child `x` and any additional key-policy details remain pending.
 - [ ] Shell constructs certificate
 - [ ] Shell verifies certificate before returning it
 - [ ] Shell displays certificate as response QR
-- [x] host response decoder implemented and QR round-trip verified
 - [ ] host scans physical Shell response
 - [ ] save/import certificate
 - [ ] GnuPG accepts certificate
@@ -490,6 +552,15 @@ arrived; final child `x` and any additional key-policy details remain pending.
 
 ## Final Success Condition
 
+        RUNNABLE FIRMWARE BUILD
+             |
+             v
+        OPENPGP MENU ACTION
+             |
+             v
+        CREATE_IDENTITY QR
+             |
+             v
         SHELL DISPLAY
              |
              | UID + fingerprint
@@ -518,7 +589,6 @@ arrived; final child `x` and any additional key-policy details remain pending.
 # Branch / PR Stack
 
     upstream/master
-    825ba4c
        |
        v
     feature/openpgp-cert
@@ -526,14 +596,16 @@ arrived; final child `x` and any additional key-policy details remain pending.
     1212e05
        |
        +-- PR #225 OPEN ✅
+       +-- REVIEW / MERGE PENDING
        |
        v
     feature/openpgp-integration
     23b4eb6
     8b5a6d2
        |
-       +-- PR #226 DRAFT OPEN ✅
-       |   DEPENDS ON PR #225
+       +-- PR #226 OPEN ✅
+       +-- DEPENDS ON PR #225
+       +-- REVIEW / MERGE PENDING
        |
        v
     feature/openpgp-orchestration
@@ -546,106 +618,124 @@ arrived; final child `x` and any additional key-policy details remain pending.
     9613b81
     e50e282
     374fb31
+    761ebc3
+    3c1f9f0
        |
-       +-- PUSHED TO origin ✅
-       +-- NO STANDALONE PR RIGHT NOW
-       |
-       v
-    derivation path policy
-       |
-       +-- NAMESPACE GUIDANCE RECEIVED ✅
-       +-- FINAL x POLICY PENDING ⏳
+       +-- PR #227 OPEN / READY FOR REVIEW ✅
+       +-- DEPENDS ON PR #225 + PR #226
+       +-- CURRENT HEAD: 3c1f9f0
+       +-- CURRENTLY SHOWS FULL 15-COMMIT STACK
        |
        v
-    menu wiring + physical E2E
+    runnable firmware build from PR #227
+       |
+       +-- WAITING ON FIRMWARE DEVELOPER ⏳
+       |
+       v
+    physical Shell E2E
+       |
+       v
+    final GnuPG validation
 
 
 # Current Exact Position
 
-    Request protocol                     ✅
+    OpenPGP primitives                    ✅ PR #225
             ↓
-    UID + creation_time                  ✅
+    Request protocol                      ✅ PR #226
             ↓
-    trusted path interface               ✅
+    UID + creation_time                   ✅
             ↓
-    Keycard public-key export            ✅
+    trusted path interface                ✅
             ↓
-    OpenPGP primary-key body             ✅
+    Keycard public-key export             ✅
             ↓
-    Fingerprint derivation               ✅
+    OpenPGP primary-key body              ✅
             ↓
-    Certification digest                 ✅
+    Fingerprint derivation                ✅
             ↓
-    Display UID + fingerprint            ✅
+    Certification digest                  ✅
             ↓
-    User approval                        ✅
+    Display UID + fingerprint             ✅
             ↓
-    Keycard certification signature      ✅
+    User approval                         ✅
             ↓
-    Positive UID certification packet    ✅
+    Keycard certification signature       ✅
             ↓
-    Certificate assembly                 ✅
+    Positive UID certification packet     ✅
             ↓
-    Fingerprint / issuer binding          ✅
+    Certificate assembly                  ✅
             ↓
-    Cryptographic self-verification      ✅
+    Fingerprint / issuer binding           ✅
             ↓
-    Dedicated UR:BYTES request           ✅
+    Cryptographic self-verification       ✅
             ↓
-    UR:BYTES certificate response        ✅
+    Dedicated UR:BYTES request            ✅
+            ↓
+    UR:BYTES certificate response         ✅
             ↓
     Host request / response tooling       ✅
             ↓
-    +------------------------------------+
-    | PRODUCTION DERIVATION PATH         |
-    | namespace proposed / x pending      |
-    +------------------------------------+
+    OpenPGP namespace                     ✅
+    m/43'/60'/1581'/5261136'/x
+            ↓
+    Current child policy                  ✅ PROVISIONAL
+    x = 0
+            ↓
+    Shell path-policy wrapper             ✅
+            ↓
+    OpenPGP menu/action                   ✅
+            ↓
+    PR #227                               ✅ READY FOR REVIEW
             ↓
     +------------------------------------+
-    | FINAL CHILD POLICY                 |
+    | RUNNABLE FIRMWARE BUILD            |
+    | from PR #227                       |
     |      ← WE ARE HERE                 |
     +------------------------------------+
             ↓
-    OpenPGP menu/action                  ⬜
-            ↓
     Physical Shell E2E                   ⬜
             ↓
-    GnuPG final validation               ⬜
+    Final GnuPG validation               ⬜
+
+Parallel policy item still pending:
+
+    maintainer confirms exact child x semantics / key-type policy ⏳
 
 
 # Project Snapshot
 
     PR #225 — OpenPGP primitives
     ████████████████████████████████ 100% ✅
-    Draft PR OPEN
+    CODE COMPLETE / OPEN / REVIEW-MERGE PENDING
 
     PR #226 — OpenPGP request protocol
     ████████████████████████████████ 100% ✅
-    DRAFT PR OPEN / DEPENDS ON #225
+    CODE COMPLETE / OPEN / DEPENDS ON #225
 
-    Identity orchestration core
+    PR #227 — identity creation + Shell integration
     ████████████████████████████████ 100% ✅
-    COMPLETE / BRANCH PUSHED / NO STANDALONE PR
+    CODE COMPLETE / READY FOR REVIEW / DEPENDS ON #225 + #226
 
     Derivation policy
-    ████████████████████████░░░░░░░░  75% 🟡
-    PGP NAMESPACE PROPOSED / FINAL x POLICY PENDING
+    █████████████████████████████░░░  90% 🟡
+    NAMESPACE + x=0 IMPLEMENTED / FINAL x SEMANTICS PENDING
 
     Shell UI + QR integration
-    ███████████████████████████░░░░░  85% 🟡
-    CORE QR FLOW COMPLETE / MENU PATH PENDING
+    ████████████████████████████████ 100% ✅
+    MENU + QR FLOW COMPLETE / PHYSICAL VALIDATION PENDING
 
     Host E2E tooling
     ████████████████████████████████ 100% ✅
     MERGED INTO 0xterricola/keycard-openpgp MAIN / NOT SHELL FIRMWARE
 
     Device + GnuPG E2E
-    ███████████░░░░░░░░░░░░░░░░░░░░░  35% ⬜
-    HOST TOOLING READY / WAITING ON PATH + PHYSICAL TEST
+    ███████████████░░░░░░░░░░░░░░░░░  45% ⬜
+    WAITING ON RUNNABLE PR #227 FIRMWARE BUILD
 
     Overall project
-    ██████████████████████████░░░░░░  80% 🟡
-    SOFTWARE + HOST VERTICAL SLICE READY / PHYSICAL E2E STILL PENDING
+    █████████████████████████████░░░  90% 🟡
+    SOFTWARE VERTICAL SLICE COMPLETE / HARDWARE E2E REMAINS
 
 
 ## Next Checkbox
@@ -653,6 +743,16 @@ arrived; final child `x` and any additional key-policy details remain pending.
 - [x] host CREATE_IDENTITY request / response QR tooling
 - [x] maintainer proposes dedicated OpenPGP namespace
   `m/43'/60'/1581'/5261136'/x`
-- [ ] define final child `x` policy and any required key-type policy
-- [ ] define that path in Shell and wire the OpenPGP menu/action
-- [ ] run the first physical Shell CREATE_IDENTITY E2E
+- [x] implement current `x = 0` Shell-owned policy
+- [x] bind policy to `core_openpgp_run()`
+- [x] add OpenPGP main-menu action
+- [x] release-build the complete software flow
+- [x] open upstream PR #227
+- [x] mark PR #227 ready for review
+- [ ] maintainer confirms final child `x` semantics / any additional key-type policy
+- [ ] receive runnable firmware build containing PR #227
+- [ ] run first physical Shell CREATE_IDENTITY E2E
+- [ ] validate returned certificate with GnuPG
+- [ ] verify cancel / malformed-request / card-failure behavior on hardware
+- [ ] address any hardware-only issues discovered during E2E
+- [ ] review / merge PR #225, then #226, then #227

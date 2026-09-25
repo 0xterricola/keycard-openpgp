@@ -1,0 +1,15 @@
+{
+  "name": "host-e2e",
+  "version": "1.0.0",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ngraveio/bc-ur": "^1.1.13",
+    "cbor2": "^2.3.0"
+  }
+}

@@ -356,11 +356,15 @@ OpenPGP has a dedicated purpose-specific action and explicitly requests
 
 # Host E2E Tooling
 
+**Repository:** `0xterricola/keycard-openpgp`
+
 **Branch:** `feature/openpgp-host-e2e`
 
 **Commit:** `194bd8f` — `test: add OpenPGP Shell host E2E tooling`
 
-**PR:** open in `keycard-openpgp`
+**PR:** #23 — merged into `0xterricola/keycard-openpgp` `main`
+
+**Scope:** Host-side test tooling in the project tracker/research repository. This is not part of the `keycard-tech/keycard-shell` firmware PR stack.
 
 `████████████████████████████████  100% ✅ HOST TOOLING COMPLETE`
 
@@ -617,7 +621,7 @@ That remains trusted Shell policy and is still blocked on maintainer guidance.
 
     Host E2E tooling
     ████████████████████████████████ 100% ✅
-    REQUEST + RESPONSE QR ROUND TRIPS VERIFIED / PR OPEN
+    MERGED INTO 0xterricola/keycard-openpgp MAIN / NOT SHELL FIRMWARE
 
     Device + GnuPG E2E
     ███████████░░░░░░░░░░░░░░░░░░░░░  35% ⬜

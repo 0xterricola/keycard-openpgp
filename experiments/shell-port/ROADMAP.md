@@ -2,7 +2,7 @@
 
 ## Overall Project
 
-`████████████████████████░░░░░░░░  ~75%`
+`██████████████████████████░░░░░░  ~80%`
 
 ### Goal
 
@@ -354,9 +354,84 @@ OpenPGP has a dedicated purpose-specific action and explicitly requests
 `BYTES`; the existing generic transaction QR dispatcher remains unchanged.
 
 
+# Host E2E Tooling
+
+**Branch:** `feature/openpgp-host-e2e`
+
+**Commit:** `194bd8f` — `test: add OpenPGP Shell host E2E tooling`
+
+**PR:** open in `keycard-openpgp`
+
+`████████████████████████████████  100% ✅ HOST TOOLING COMPLETE`
+
+## Request Generator
+
+- [x] isolated under `experiments/shell-port/host-e2e`
+- [x] frozen CREATE_IDENTITY request format
+- [x] version = `1`
+- [x] operation = `CREATE_IDENTITY`
+- [x] UID encoded as CBOR byte string
+- [x] `creation_time` encoded as uint32
+- [x] host cannot provide derivation path
+- [x] host cannot provide public key
+- [x] host cannot provide fingerprint
+- [x] host cannot provide certification digest
+- [x] host cannot provide signature
+- [x] inner CBOR wrapped as `UR:BYTES`
+- [x] QR image generated
+- [x] generated UR self-decodes byte-for-byte
+- [x] QR scan reproduces the exact UR payload
+
+## Response Decoder
+
+- [x] accepts `UR:BYTES` text
+- [x] accepts `UR:BYTES` file
+- [x] accepts QR image
+- [x] recovers complete OpenPGP certificate
+- [x] requires packet sequence `6 -> 13 -> 2`
+- [x] writes recovered `.pgp` certificate
+- [x] known-good certificate round-trips byte-for-byte
+- [x] response QR round-trips byte-for-byte
+
+## Proven Test Vectors
+
+Request:
+
+    CBOR
+      ↓
+    UR:BYTES
+      ↓
+    QR
+      ↓
+    zbar scan
+      ↓
+    identical UR payload ✅
+
+Response:
+
+    known-good OpenPGP certificate
+      ↓
+    UR:BYTES
+      ↓
+    QR
+      ↓
+    host decoder
+      ↓
+    identical certificate bytes ✅
+
+## Remaining
+
+The host tooling is ready for the physical Shell test.
+
+It intentionally does not define or transmit the OpenPGP derivation path.
+That remains trusted Shell policy and is still blocked on maintainer guidance.
+
+
+---
+
 # Final Device + GnuPG Validation
 
-`████████░░░░░░░░░░░░░░░░░░░░░░░░  ~25% ⬜`
+`███████████░░░░░░░░░░░░░░░░░░░░░  ~35% ⬜`
 
 ## Already Proven
 
@@ -378,7 +453,8 @@ OpenPGP has a dedicated purpose-specific action and explicitly requests
 
 - [ ] finalize production derivation path
 - [ ] expose OpenPGP action in Shell menu
-- [ ] generate CREATE_IDENTITY request
+- [x] host CREATE_IDENTITY request generator implemented and QR round-trip verified
+- [ ] generate final physical-test CREATE_IDENTITY request
 - [ ] scan request with physical Shell
 - [ ] Shell derives physical Keycard public key
 - [ ] Shell displays requested UID
@@ -388,7 +464,8 @@ OpenPGP has a dedicated purpose-specific action and explicitly requests
 - [ ] Shell constructs certificate
 - [ ] Shell verifies certificate before returning it
 - [ ] Shell displays certificate as response QR
-- [ ] host scans response
+- [x] host response decoder implemented and QR round-trip verified
+- [ ] host scans physical Shell response
 - [ ] save/import certificate
 - [ ] GnuPG accepts certificate
 - [ ] GnuPG reports valid self-signature
@@ -502,6 +579,8 @@ OpenPGP has a dedicated purpose-specific action and explicitly requests
             ↓
     UR:BYTES certificate response        ✅
             ↓
+    Host request / response tooling       ✅
+            ↓
     +------------------------------------+
     | PRODUCTION DERIVATION PATH         |
     |      ← WE ARE HERE / BLOCKED       |
@@ -536,17 +615,22 @@ OpenPGP has a dedicated purpose-specific action and explicitly requests
     ███████████████████████████░░░░░  85% 🟡
     CORE QR FLOW COMPLETE / MENU PATH PENDING
 
+    Host E2E tooling
+    ████████████████████████████████ 100% ✅
+    REQUEST + RESPONSE QR ROUND TRIPS VERIFIED / PR OPEN
+
     Device + GnuPG E2E
-    ████████░░░░░░░░░░░░░░░░░░░░░░  25% ⬜
-    WAITING ON PATH + PHYSICAL TEST
+    ███████████░░░░░░░░░░░░░░░░░░░░░  35% ⬜
+    HOST TOOLING READY / WAITING ON PATH + PHYSICAL TEST
 
     Overall project
-    ████████████████████████░░░░░░░░  75% 🟡
-    SOFTWARE VERTICAL SLICE COMPLETE THROUGH VERIFIED UR:BYTES OUTPUT
+    ██████████████████████████░░░░░░  80% 🟡
+    SOFTWARE + HOST VERTICAL SLICE READY / PHYSICAL E2E STILL PENDING
 
 
 ## Next Checkbox
 
+- [x] host CREATE_IDENTITY request / response QR tooling
 - [ ] maintainer selects / approves the production OpenPGP derivation path
 - [ ] define that path in Shell and wire the OpenPGP menu/action
 - [ ] run the first physical Shell CREATE_IDENTITY E2E

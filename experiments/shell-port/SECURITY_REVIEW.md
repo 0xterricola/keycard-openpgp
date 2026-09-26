@@ -109,8 +109,8 @@ testing are complete.
 
 ## SR-001 — Host-Controlled Creation Time Is Not Semantically Reviewed
 
-**Severity:** Medium
-**Confidence:** High
+**Severity:** Medium<br>
+**Confidence:** High<br>
 **Status:** Open — design decision required
 
 ### Description
@@ -161,8 +161,8 @@ The final choice should be reviewed with the Keycard maintainers.
 
 ## SR-002 — Signing Buffer Needs Explicit Path-Length Bound
 
-**Severity:** Low
-**Confidence:** High
+**Severity:** Low<br>
+**Confidence:** High<br>
 **Status:** Open — hardening
 
 ### Description
@@ -212,8 +212,8 @@ Add an explicit bounds check in the shared Keycard signing helper before either
 
 ## SR-003 — Non-Canonical MPI Encodings Accepted by Verifier
 
-**Severity:** Low
-**Confidence:** High
+**Severity:** Low<br>
+**Confidence:** High<br>
 **Status:** Open — hardening
 
 ### Description
@@ -253,8 +253,8 @@ Validate that:
 
 ## SR-004 — Explicit Length-Narrowing Checks
 
-**Severity:** Low
-**Confidence:** High
+**Severity:** Low<br>
+**Confidence:** High<br>
 **Status:** Open — hardening
 
 ### Description
@@ -283,7 +283,7 @@ Add explicit upper-bound checks before narrowing generic `size_t` lengths.
 
 ## SR-005 — OpenPGP v4 / RFC 9580 Compatibility Position
 
-**Severity:** Informational
+**Severity:** Informational<br>
 **Status:** Documented
 
 ### Description
@@ -312,11 +312,11 @@ See `ROADMAP.md` for the compatibility disclosure and future v6 track.
 
 ## SR-006 — TLV / APDU Response Parsing Review
 
-**Severity:** Low
-**Confidence:** High
-**Status:** Remediation submitted — [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228)
-**Fix:** Keycard Shell PR [#228](https://github.com/keycard-tech/keycard-shell/pull/228)
-**Regression test:** Pending — appropriate non-factory regression-test location to be established
+**Severity:** Low<br>
+**Confidence:** High<br>
+**Status:** Remediation submitted<br>
+**Tracking:** [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228)<br>
+**Regression test:** Pending — appropriate non-factory regression-test location to be established<br>
 **Verified by:** `shellos.elf` builds and signs successfully with the remediation applied; targeted parser regression execution remains pending
 
 ### Description

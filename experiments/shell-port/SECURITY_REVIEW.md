@@ -315,9 +315,9 @@ See `ROADMAP.md` for the compatibility disclosure and future v6 track.
 **Severity:** Low
 **Confidence:** High
 **Status:** Remediation submitted — [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228)
-**Fix:** Keycard Shell commit `933fcf9` (`keycard: bound signature TLV response parsing`)
-**Regression test:** firmware test-app cases for truncated direct and nested signature responses
-**Verified by:** `shellos.elf` and `shellos-test.elf` build and sign successfully; physical execution of the new firmware self-test remains pending
+**Fix:** Keycard Shell PR [#228](https://github.com/keycard-tech/keycard-shell/pull/228)
+**Regression test:** Pending — appropriate non-factory regression-test location to be established
+**Verified by:** `shellos.elf` builds and signs successfully with the remediation applied; targeted parser regression execution remains pending
 
 ### Description
 
@@ -354,9 +354,9 @@ defensive parser hardening.
 
 ### Remediation
 
-Keycard Shell PR [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228) adds bounds-aware variants of
-the TLV tag, length, primitive, and fixed-primitive readers while preserving the
-legacy API for existing callers.
+Keycard Shell PR [#228](https://github.com/keycard-tech/keycard-shell/pull/228)
+adds bounds-aware variants of the TLV tag, length, primitive, and
+fixed-primitive readers while preserving the legacy API for existing callers.
 
 `keycard_read_signature()` is migrated to those bounded helpers so that:
 
@@ -366,25 +366,30 @@ legacy API for existing callers.
   before `memcpy`
 - the existing valid direct signature response format remains accepted
 
-The remediation is implemented by commit `933fcf9`.
+The parser remediation was introduced by commit `933fcf9`.
 
-### Regression Tests
+Follow-up commit `74c3368` restores the factory QA test app unchanged after
+maintainer clarification that it is not a unit-test harness.
 
-The firmware test app now includes cases for:
+### Planned Regression Tests
 
-- [x] direct response `80 41` with a logical response length of two bytes
-- [x] truncated direct long-form length
-- [x] truncated wrapped long-form length
-- [x] truncated nested tag
-- [x] truncated nested length
-- [x] valid direct 65-byte signature response remains accepted
-- [x] rejected truncated responses do not modify the output signature buffer
-- [ ] execute the new firmware self-test on development-capable Shell hardware
+The factory QA test app is intentionally not modified. Targeted regression
+coverage should be added in an appropriate non-factory test environment.
 
-Both production and test firmware build and sign successfully with the
+Planned cases:
+
+- [ ] direct response `80 41` with a logical response length of two bytes is rejected
+- [ ] truncated direct long-form length is rejected
+- [ ] truncated wrapped long-form length is rejected
+- [ ] truncated nested tag is rejected
+- [ ] truncated nested length is rejected
+- [ ] valid direct 65-byte signature response remains accepted
+- [ ] rejected truncated responses do not modify the output signature buffer
+
+Production firmware `shellos.elf` builds and signs successfully with the
 remediation applied.
 
-Physical execution of the new firmware self-test remains pending.
+Targeted parser regression execution remains pending.
 
 ---
 

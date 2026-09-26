@@ -92,7 +92,7 @@ Treat as trusted for the current design:
 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
-| SR-001 | Medium | Host-controlled creation time is not semantically reviewed | Open — design decision required |
+| SR-001 | Medium | Host-controlled creation time is not semantically reviewed | Remediation submitted — [keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227) |
 | SR-002 | Low | `keycard_cmd_sign()` fixed signing buffer lacks an explicit path-length bound | Open — hardening |
 | SR-003 | Low | MPI verifier accepts non-canonical bit-length encodings | Open — hardening |
 | SR-004 | Low | Generic OpenPGP helpers narrow some `size_t` lengths without explicit upper-bound rejection | Open — hardening |
@@ -111,44 +111,72 @@ testing are complete.
 
 **Severity:** Medium<br>
 **Confidence:** High<br>
-**Status:** Open — design decision required
+**Status:** Remediation submitted<br>
+**Tracking:** [keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227)<br>
+**Implementation:** `098ca3c` — `openpgp: review host-provided creation time`<br>
+**Verified by:** release firmware builds and signs successfully; source-level control-flow review confirms creation-time approval occurs before `keycard_cmd_sign()`; physical Shell E2E remains pending
 
 ### Description
 
 The OpenPGP request allows the host to provide `creation_time`.
 
 That value becomes part of the OpenPGP primary-key packet and therefore affects
-the v4 fingerprint. It is also included in the certification signature
-metadata.
+the v4 fingerprint. It is also included in the hashed certification-signature
+creation-time subpacket.
 
-The current approval flow displays:
+Before remediation, the approval flow displayed:
 
 - exact UID
 - derived fingerprint
 
-but does not separately display the semantic creation timestamp.
+but did not separately display the host-provided creation time.
 
 ### Impact
 
-A host can request the same Keycard key and UID using different creation times,
-causing distinct OpenPGP v4 fingerprints to be created from the same underlying
-secret key.
+A host could request the same Keycard key and UID using different creation
+times, causing distinct OpenPGP v4 fingerprints to be created from the same
+underlying secret key.
 
 This does not expose the private key and does not provide an arbitrary signing
 oracle.
 
 The concern is identity stability and trusted semantic review: host-controlled
-metadata materially changes the resulting identity while the user sees only its
-derived fingerprint.
+metadata materially changes the resulting identity and certification metadata,
+so the exact value must be covered by the user's approval.
 
-### Candidate Remediation
+### Remediation
 
-Choose one explicit policy:
+The host continues to provide the OpenPGP creation time.
 
-1. make creation time Shell-owned / persisted, or
-2. allow a host-proposed creation time but display and approve it explicitly.
+Shell does not introduce a trusted RTC, persisted wall clock, or independent
+claim that the host-provided timestamp represents the actual current time.
 
-The final choice should be reviewed with the Keycard maintainers.
+Instead, Shell now treats the creation time as untrusted semantic metadata that
+must be explicitly reviewed before signing.
+
+The approval flow now displays, in order:
+
+- exact UID
+- exact host-provided Unix creation time
+- Shell-derived fingerprint
+
+The final approval prompt covers the UID, Unix time, and fingerprint.
+
+The same `creation_time` value used to construct the primary-key packet and
+certification-signature metadata is passed into the confirmation flow. If the
+user rejects or cancels review, execution returns before `keycard_cmd_sign()` is
+reached.
+
+This remediation is implemented by commit `098ca3c` in
+[keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227).
+
+### Verification
+
+- [x] release firmware builds successfully with `cmake --build --preset release`
+- [x] `git diff --check` passes
+- [x] source-level review confirms creation-time review occurs before Keycard signing
+- [ ] physical Shell review / cancellation behavior validated
+- [ ] final certificate timestamp and fingerprint validated in physical E2E
 
 ### Regression Tests
 

@@ -23,7 +23,7 @@ Current reviewed implementation snapshot:
 
 - PR #225 head: `1212e05`
 - PR #226 head: `8b5a6d2`
-- PR #227 head: `3c1f9f0`
+- PR #227 head: `098ca3c`
 
 Primary data flow:
 
@@ -37,7 +37,7 @@ Primary data flow:
             ↓
     OpenPGP key + fingerprint
             ↓
-    exact UID + fingerprint display
+    exact UID + Unix creation time + fingerprint display
             ↓
     physical approval
             ↓
@@ -93,7 +93,7 @@ Treat as trusted for the current design:
 | ID | Severity | Finding | Status |
 |---|---|---|---|
 | SR-001 | Medium | Host-controlled creation time is not semantically reviewed | Remediation submitted — [keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227) |
-| SR-002 | Low | `keycard_cmd_sign()` fixed signing buffer lacks an explicit path-length bound | Open — hardening |
+| SR-002 | Low | `keycard_cmd_sign()` fixed signing buffer lacks an explicit path-length bound | Remediation submitted — [keycard-tech/keycard-shell#229](https://github.com/keycard-tech/keycard-shell/pull/229) |
 | SR-003 | Low | MPI verifier accepts non-canonical bit-length encodings | Open — hardening |
 | SR-004 | Low | Generic OpenPGP helpers narrow some `size_t` lengths without explicit upper-bound rejection | Open — hardening |
 | SR-005 | Informational | OpenPGP v4 / RFC 9580 compatibility position must remain explicit | Documented |
@@ -191,23 +191,38 @@ This remediation is implemented by commit `098ca3c` in
 
 **Severity:** Low<br>
 **Confidence:** High<br>
-**Status:** Open — hardening
+**Status:** Remediation submitted<br>
+**Tracking:** [keycard-tech/keycard-shell#229](https://github.com/keycard-tech/keycard-shell/pull/229)<br>
+**Implementation:** `493f962` — `keycard: bound signing payload length`<br>
+**Verified by:** current caller audit, `git diff --check`, and successful release firmware build/signing; targeted oversized-input regression execution remains pending
 
 ### Description
 
-The shared Keycard signing helper uses a fixed signing buffer and copies:
+The shared Keycard signing helper uses a fixed logical 104-byte signing payload
+buffer and copies:
 
     hash || derivation_path
 
 into it.
 
-An explicit check that:
-
-    hash_len + path_len <= signing_buffer_size
-
-should occur before the copies.
+Before remediation, `keycard_cmd_sign()` did not itself enforce that the
+combined logical payload fit within those 104 bytes before performing the two
+`memcpy` operations.
 
 ### Current Reachability
+
+Existing production callers already constrain their inputs to fit the buffer.
+
+The maximum BIP44 derivation path is 40 bytes.
+
+For BIP340 Schnorr signing, the helper uses a 64-byte signing input, giving the
+maximum existing payload:
+
+    64 + 40 = 104 bytes
+
+For existing ECDSA signing, the helper uses a 32-byte digest:
+
+    32 + 40 = 72 bytes
 
 The current OpenPGP production path is five 32-bit components:
 
@@ -215,24 +230,54 @@ The current OpenPGP production path is five 32-bit components:
 
 which serializes to 20 bytes.
 
-With the current 32-byte ECDSA digest, the OpenPGP call uses approximately:
+With its 32-byte ECDSA digest, the OpenPGP call uses:
 
     32 + 20 = 52 bytes
 
-and therefore does not approach the existing 104-byte signing buffer.
+No overflow through the current BTC, ETH, or OpenPGP production callers was
+demonstrated.
 
-The finding is defensive hardening of the shared Keycard function rather than a
-demonstrated overflow through the current OpenPGP production path.
+The finding is defensive hardening of the shared Keycard helper so that the
+helper itself enforces the invariant already relied upon by its callers.
 
 ### Remediation
 
-Add an explicit bounds check in the shared Keycard signing helper before either
-`memcpy`.
+Keycard Shell PR [#229](https://github.com/keycard-tech/keycard-shell/pull/229)
+names the existing 104-byte logical signing payload limit and checks the input
+length before either copy.
+
+The helper now rejects an input when:
+
+    if (hash_len > SIGN_DATA_MAX_LEN ||
+        path_len > (SIGN_DATA_MAX_LEN - hash_len)) {
+      return ERR_DATA;
+    }
+
+The subtraction form avoids relying on unchecked addition when validating the
+combined length.
+
+Valid existing callers are unchanged. The maximum current BIP340 case continues
+to fit the 104-byte logical payload limit exactly.
+
+This remediation is implemented by commit `493f962` in
+[keycard-tech/keycard-shell#229](https://github.com/keycard-tech/keycard-shell/pull/229).
+
+### Verification
+
+- [x] current BTC and ETH signing callers audited
+- [x] 40-byte maximum BIP44 path constraint confirmed
+- [x] maximum BIP340 payload confirmed as 104 bytes
+- [x] maximum current ECDSA payload confirmed as 72 bytes
+- [x] current OpenPGP signing payload confirmed as 52 bytes
+- [x] bounds check occurs before either `memcpy`
+- [x] `git diff --check` passes
+- [x] release firmware builds and signs successfully
+- [ ] targeted oversized-input regression execution
 
 ### Regression Tests
 
 - [ ] normal OpenPGP path signs successfully
-- [ ] maximum accepted path fits
+- [ ] maximum accepted 104-byte signing payload succeeds
 - [ ] oversized path is rejected before copying
 - [ ] rejected oversized path does not invoke signing
 

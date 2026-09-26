@@ -371,6 +371,14 @@ implementation even if a separate v6 path is added later.
 
 ## Security Review Status
 
+The detailed defensive review of PRs #225 → #226 → #227 is tracked in
+[`SECURITY_REVIEW.md`](./SECURITY_REVIEW.md).
+
+That document records the threat model, findings, remediation status,
+regression-test requirements, investigated non-findings, and remaining
+cross-PR audit work.
+
+
 Standards compatibility and security validation are separate questions.
 
 Successful builds and GnuPG interoperability do not replace security review.

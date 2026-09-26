@@ -296,6 +296,93 @@ PR #227 targets upstream `master` and is stacked on #225 and #226.
 Because the prerequisite PRs are not yet merged, GitHub currently shows the full stacked history in #227 (15 commits). After the prerequisite PRs land and the stack is rebased/updated, the review diff can collapse to the orchestration / path-policy / menu-specific delta.
 
 
+
+# Standards / Compatibility Disclosure
+
+**Current interoperability target:** OpenPGP v4 + ECDSA/secp256k1 + GnuPG
+
+The current implementation intentionally targets OpenPGP v4 because the
+project began with Keycard's existing hardware-backed secp256k1 capability
+and a concrete interoperability goal: derive the Keycard public key, construct
+an OpenPGP identity around that same key material, have the Keycard sign the
+certification digest, and produce a certificate accepted by GnuPG.
+
+This is a deliberate compatibility target, not a claim that OpenPGP v4 is the
+preferred format for new general-purpose OpenPGP implementations.
+
+## Standards Position
+
+- [x] current implementation explicitly targets OpenPGP v4
+- [x] certification signatures use ECDSA with SHA-256
+- [x] the v4 fingerprint uses SHA-1 because that is part of the v4 fingerprint
+  construction; SHA-1 is not being used as the certification signature hash
+- [x] RFC 9580 / OpenPGP v6 is recognized as the modern standards direction
+  for newly generated OpenPGP keys
+- [x] secp256k1 is not part of the standardized RFC 9580 OpenPGP ECC curve set
+- [x] current implementation does not claim RFC 9580 / v6 conformance
+- [x] current implementation does not claim standards endorsement of
+  secp256k1 for modern OpenPGP
+- [x] use of v4 is documented as an interoperability / existing-hardware
+  decision rather than an unnoticed version choice
+
+Using v4 for this Keycard interoperability work is not, by itself, evidence of
+a cryptographic vulnerability or a violation of the OpenPGP model. It does,
+however, carry a standards and lifecycle caveat: new general-purpose OpenPGP
+implementations should evaluate the v6 path rather than assuming v4 is the
+long-term target.
+
+## Why v4 Exists Here
+
+    existing Keycard hardware
+            ↓
+    secp256k1 key material
+            ↓
+    Keycard ECDSA / SHA-256 signing
+            ↓
+    OpenPGP v4 certificate construction
+            ↓
+    GnuPG interoperability
+            ↓
+    trusted Shell review + approval workflow
+
+The purpose of the current PR stack is to make that specific hardware-backed
+workflow explicit, reviewable, and testable.
+
+## Future v6 Track
+
+OpenPGP v6 should be investigated as a separate compatibility and standards
+track rather than silently changing the semantics of the current v4 PR stack.
+
+A future v6 investigation should determine:
+
+- [ ] which RFC 9580-compatible signing algorithm can be supported by Keycard
+- [ ] whether future standardized secp256k1 OpenPGP support becomes available
+- [ ] v6 public-key packet construction
+- [ ] SHA-256 / 32-byte v6 fingerprints
+- [ ] v6 key-ID semantics
+- [ ] salted v6 signature construction
+- [ ] v6 self-certification verification
+- [ ] interoperability with RFC 9580 implementations
+- [ ] whether the existing OpenPGP derivation namespace can remain unchanged
+- [ ] migration / coexistence policy between v4 and any future v6 identity
+
+The current v4 work should remain usable as a documented interoperability
+implementation even if a separate v6 path is added later.
+
+## Security Review Status
+
+Standards compatibility and security validation are separate questions.
+
+Successful builds and GnuPG interoperability do not replace security review.
+The current implementation is undergoing defensive review of the complete
+PR #225 -> #226 -> #227 data path, including parsing, display/signing binding,
+derivation-path ownership, memory safety, OpenPGP encoding, and failure paths.
+
+Physical Shell E2E validation remains required before the implementation is
+considered fully validated on production hardware.
+
+---
+
 # Derivation Policy
 
 **Purpose:** Shell-owned OpenPGP derivation path

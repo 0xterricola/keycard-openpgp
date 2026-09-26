@@ -97,7 +97,7 @@ Treat as trusted for the current design:
 | SR-003 | Low | MPI verifier accepts non-canonical bit-length encodings | Open — hardening |
 | SR-004 | Low | Generic OpenPGP helpers narrow some `size_t` lengths without explicit upper-bound rejection | Open — hardening |
 | SR-005 | Informational | OpenPGP v4 / RFC 9580 compatibility position must remain explicit | Documented |
-| SR-006 | Pending review | Inherited TLV/APDU response parsing requires bounds review | Pending audit |
+| SR-006 | Low | Inherited signature-response TLV parsing did not enforce logical APDU response bounds | Remediation submitted — [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228) |
 
 No Critical or High-severity issue has been confirmed in the reviewed
 `CREATE_IDENTITY` path at this checkpoint.
@@ -312,34 +312,79 @@ See `ROADMAP.md` for the compatibility disclosure and future v6 track.
 
 ## SR-006 — TLV / APDU Response Parsing Review
 
-**Severity:** Pending review
-**Status:** Pending audit
+**Severity:** Low
+**Confidence:** High
+**Status:** Remediation submitted — [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228)
+**Fix:** Keycard Shell commit `933fcf9` (`keycard: bound signature TLV response parsing`)
+**Regression test:** firmware test-app cases for truncated direct and nested signature responses
+**Verified by:** `shellos.elf` and `shellos-test.elf` build and sign successfully; physical execution of the new firmware self-test remains pending
 
 ### Description
 
-The OpenPGP flow relies on existing Keycard APDU and TLV response-decoding
-helpers.
+The OpenPGP review identified a pre-existing weakness in the shared Keycard
+signature-response parser.
 
-The remaining audit must establish that malformed or unexpected card responses
-cannot cause:
+`keycard_read_signature()` receives the logical APDU response length, but the
+legacy TLV readers used by the function do not receive a source-buffer length.
 
-- out-of-bounds reads
-- out-of-bounds writes
-- incorrect signature extraction
-- use of partially parsed values
-- signing success being inferred from malformed response data
+In the direct-signature fast path, a response beginning with:
 
-### Required Review
+    80 41
 
-- [ ] inspect `keycard_read_signature()`
-- [ ] inspect `tlv_read_tag()`
-- [ ] inspect `tlv_read_length()`
-- [ ] inspect fixed-primitive TLV readers
-- [ ] confirm every helper is bounded by APDU response length
-- [ ] test truncated TLV
-- [ ] test invalid tag
-- [ ] test invalid length
-- [ ] test unexpected signature shape
+declares a 65-byte value. If the logical response length is only two bytes, the
+legacy fixed-primitive reader can still copy 65 bytes beginning after those two
+bytes.
+
+In the current APDU layout this has not been demonstrated to cross the allocated
+APDU buffer. It can, however, read stale bytes beyond the logical response
+boundary and interpret them as signature data.
+
+The wrapped-signature path also called length-unaware tag and length readers
+before all caller-side bounds checks had taken effect.
+
+This behavior predates the OpenPGP changes and is shared with existing Keycard
+signing paths. It is therefore an inherited Keycard Shell hardening issue, not a
+vulnerability introduced by the OpenPGP implementation.
+
+Secure Channel V2 authenticates and decrypts response plaintext before TLV
+parsing, so an unauthenticated transport attacker cannot directly inject an
+arbitrary malformed plaintext response without forging the channel
+authentication. Malformed authenticated card responses remain relevant to
+defensive parser hardening.
+
+### Remediation
+
+Keycard Shell PR [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228) adds bounds-aware variants of
+the TLV tag, length, primitive, and fixed-primitive readers while preserving the
+legacy API for existing callers.
+
+`keycard_read_signature()` is migrated to those bounded helpers so that:
+
+- truncated tags are rejected before reading missing tag bytes
+- truncated long-form lengths are rejected before reading missing length bytes
+- declared payload lengths are checked against the remaining logical response
+  before `memcpy`
+- the existing valid direct signature response format remains accepted
+
+The remediation is implemented by commit `933fcf9`.
+
+### Regression Tests
+
+The firmware test app now includes cases for:
+
+- [x] direct response `80 41` with a logical response length of two bytes
+- [x] truncated direct long-form length
+- [x] truncated wrapped long-form length
+- [x] truncated nested tag
+- [x] truncated nested length
+- [x] valid direct 65-byte signature response remains accepted
+- [x] rejected truncated responses do not modify the output signature buffer
+- [ ] execute the new firmware self-test on development-capable Shell hardware
+
+Both production and test firmware build and sign successfully with the
+remediation applied.
+
+Physical execution of the new firmware self-test remains pending.
 
 ---
 
@@ -408,7 +453,7 @@ cryptographic self-certification verification before returning the certificate.
 - [ ] finish PR #225 primitive review
 - [ ] finish PR #226 CBOR/request parser review
 - [ ] finish PR #227 orchestration review
-- [ ] complete TLV/APDU parser review
+- [x] complete TLV/APDU parser review
 - [ ] review every error / cancellation path
 - [ ] review output-length failure hygiene
 - [ ] review stack/static-buffer bounds
@@ -429,7 +474,7 @@ The review is not considered complete until:
 - [ ] no unresolved High finding remains
 - [ ] every Medium finding is fixed, accepted, or explicitly deferred with rationale
 - [ ] Low findings are fixed or explicitly documented
-- [ ] pending TLV/APDU review is completed
+- [x] pending TLV/APDU review is completed
 - [ ] cancellation/reject behavior is tested on physical hardware
 - [ ] malformed request behavior is tested on physical hardware
 - [ ] card/signing failure behavior is tested on physical hardware

@@ -21,9 +21,9 @@ Upstream Keycard Shell PR stack:
 
 Current reviewed implementation snapshot:
 
-- PR #225 head: `1212e05`
-- PR #226 head: `8b5a6d2`
-- PR #227 head: `098ca3c`
+- PR #225 head: `4d3bac9`
+- PR #226 head: `c4c6989`
+- PR #227 head: `5132f7d`
 
 Primary data flow:
 
@@ -94,7 +94,7 @@ Treat as trusted for the current design:
 |---|---|---|---|
 | SR-001 | Medium | Host-controlled creation time is not semantically reviewed | Remediation submitted — [keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227) |
 | SR-002 | Low | `keycard_cmd_sign()` fixed signing buffer lacks an explicit path-length bound | Remediation submitted — [keycard-tech/keycard-shell#229](https://github.com/keycard-tech/keycard-shell/pull/229) |
-| SR-003 | Low | MPI verifier accepts non-canonical bit-length encodings | Open — hardening |
+| SR-003 | Low | OpenPGP verifier accepts non-canonical MPI bit-length encodings | Remediation submitted — [keycard-tech/keycard-shell#225](https://github.com/keycard-tech/keycard-shell/pull/225) |
 | SR-004 | Low | Generic OpenPGP helpers narrow some `size_t` lengths without explicit upper-bound rejection | Open — hardening |
 | SR-005 | Informational | OpenPGP v4 / RFC 9580 compatibility position must remain explicit | Documented |
 | SR-006 | Low | Inherited signature-response TLV parsing did not enforce logical APDU response bounds | Remediation submitted — [keycard-tech/keycard-shell#228](https://github.com/keycard-tech/keycard-shell/pull/228) |
@@ -283,42 +283,119 @@ This remediation is implemented by commit `493f962` in
 
 ---
 
-## SR-003 — Non-Canonical MPI Encodings Accepted by Verifier
+## SR-003 — OpenPGP Verifier Accepts Non-Canonical MPI Bit-Length Encodings
 
 **Severity:** Low<br>
 **Confidence:** High<br>
-**Status:** Open — hardening
+**Status:** Remediation submitted<br>
+**Tracking:** [keycard-tech/keycard-shell#225](https://github.com/keycard-tech/keycard-shell/pull/225)<br>
+**Implementation:** `4d3bac9` — `openpgp: reject non-canonical MPI bit lengths`<br>
+**Verified by:** source-level reachability review, `git diff --check`, successful release firmware build/signing, and propagation of the fix through PRs #226 and #227; targeted malformed-MPI regression execution remains pending
 
 ### Description
 
-The OpenPGP MPI reader derives the encoded byte count from the declared MPI bit
-length and bounds-checks that byte count.
+The OpenPGP verifier decoded MPI values using the declared MPI bit length to
+derive the encoded byte count, but did not verify that the declared bit length
+matched the actual significant-bit length of the encoded integer.
 
-It does not currently verify that the declared bit length is the canonical bit
-length of the encoded integer.
+This affected:
+
+- ECDSA signature MPIs `r` and `s`
+- the ECDSA public-key point MPI
+
+For example, a 32-byte scalar whose actual significant-bit length is 255 could
+also be presented with a declared bit length of 256. Both declarations produce
+a 32-byte payload length, and before remediation the fixed-width MPI reader
+would decode them to the same scalar.
+
+The mathematical ECDSA value was therefore unchanged, but the verifier accepted
+a non-canonical OpenPGP representation.
 
 ### Current Reachability
 
-Shell-generated ECDSA `r` and `s` values are encoded canonically by the local
-MPI encoder before being verified.
+The current `CREATE_IDENTITY` production flow does not accept an arbitrary
+OpenPGP certificate or certification signature packet from the host.
 
-The current certificate self-verifier therefore normally receives
-Shell-generated MPI encodings rather than arbitrary host-provided signature
-packets.
+The flow is:
+
+    Keycard raw ECDSA signature
+            ↓
+    Shell canonical MPI encoding
+            ↓
+    Shell-built certification packet
+            ↓
+    Shell-built certificate
+            ↓
+    Shell parses the exact certificate bytes it is about to return
+            ↓
+    binding and self-certification verification
+
+The Shell's `encode_mpi()` implementation calculates the actual significant-bit
+length and removes leading zero octets before serializing `r` and `s`.
+
+The public-key body is likewise constructed locally using the actual MPI bit
+length of the Keycard-derived SEC1 point.
+
+During final identity assembly, Shell verifies that the parsed primary key,
+User ID, and self-certification packet match the objects supplied to the
+assembly step before invoking the cryptographic self-certification verifier.
+
+No host-controlled malformed-MPI injection path was demonstrated in the current
+`CREATE_IDENTITY` flow.
+
+The finding is therefore defensive hardening of reusable OpenPGP verification
+primitives rather than a demonstrated production signing or verification
+exploit.
 
 ### Remediation
 
-Validate that:
+Keycard Shell PR [#225](https://github.com/keycard-tech/keycard-shell/pull/225)
+now requires the declared MPI bit length to equal the actual significant-bit
+length of the encoded payload.
 
-- unused high bits are zero where required
-- the declared MPI bit length matches the actual most-significant set bit
-- zero and oversized scalar encodings remain rejected
+For signature MPIs, `openpgp_read_mpi_fixed()` now rejects the value before
+copying it into the fixed-width scalar buffer when:
+
+    openpgp_mpi_bit_length(data + *offset, bytes) != bits
+
+The ECDSA public-key point parser applies the equivalent check before accepting
+the point MPI.
+
+This preserves canonical MPIs emitted by the existing Shell encoder while
+rejecting alternate non-canonical bit-length declarations for the same value.
+
+The remediation is implemented by commit `4d3bac9` in
+[keycard-tech/keycard-shell#225](https://github.com/keycard-tech/keycard-shell/pull/225).
+
+Because PRs #226 and #227 depend on the OpenPGP primitive layer, the updated
+#225 branch was merged upward through the stack:
+
+- PR #226 head: `c4c6989`
+- PR #227 head: `5132f7d`
+
+Both dependent branches therefore include the SR-003 remediation.
+
+### Verification
+
+- [x] signature MPI reader canonicality gap confirmed
+- [x] public-key point MPI canonicality gap confirmed
+- [x] Shell signature MPI encoder confirmed canonical
+- [x] Shell public-key MPI construction confirmed canonical
+- [x] current `CREATE_IDENTITY` reachability reviewed
+- [x] no host-controlled malformed-MPI injection path demonstrated
+- [x] canonicality checks occur before decoded values are consumed
+- [x] `git diff --check` passes
+- [x] release firmware builds and signs successfully
+- [x] remediation propagated through PRs #226 and #227
+- [ ] targeted malformed-MPI regression execution
 
 ### Regression Tests
 
-- [ ] canonical `r` and `s` accepted
-- [ ] incorrect declared bit length rejected
-- [ ] leading-zero non-canonical encoding rejected
+- [ ] canonical signature `r` and `s` MPIs accepted
+- [ ] incorrect declared signature MPI bit length rejected
+- [ ] leading-zero non-canonical signature MPI rejected
+- [ ] canonical public-key point MPI accepted
+- [ ] incorrect public-key point MPI bit length rejected
 - [ ] oversized scalar rejected
 - [ ] truncated MPI rejected
 

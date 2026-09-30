@@ -19,11 +19,23 @@ Upstream Keycard Shell PR stack:
 - PR #226 — versioned OpenPGP request protocol
 - PR #227 — trusted identity creation and Shell integration
 
-Current reviewed implementation snapshot:
+Current upstream implementation heads:
 
 - PR #225 head: `4d3bac9`
 - PR #226 head: `c4c6989`
-- PR #227 head: `5132f7d`
+- PR #227 head: `6f636d3`
+
+Security-review snapshot:
+
+- PR #225 reviewed through: `4d3bac9`
+- PR #226 reviewed through: `c4c6989`
+- PR #227 reviewed through: `6f636d3`
+
+The later PR #227 delta `5132f7d..6f636d3` was reviewed separately after the
+physical beta3 E2E pass. The review covered derivation-path buffering, trusted
+identity review, grouped identity state, fingerprint sizing, certificate
+assembly/verification, and the large style-only cleanup. No new security
+finding was identified in that delta.
 
 Primary data flow:
 
@@ -92,7 +104,7 @@ Treat as trusted for the current design:
 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
-| SR-001 | Medium | Host-controlled creation time is not semantically reviewed | Remediation submitted — [keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227) |
+| SR-001 | Medium | Host-controlled creation time is not semantically reviewed | Remediation submitted; physical review/cancel flow verified; timestamp regressions pending — [keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227) |
 | SR-002 | Low | `keycard_cmd_sign()` fixed signing buffer lacks an explicit path-length bound | Remediation submitted — [keycard-tech/keycard-shell#229](https://github.com/keycard-tech/keycard-shell/pull/229) |
 | SR-003 | Low | OpenPGP verifier accepts non-canonical MPI bit-length encodings | Remediation submitted — [keycard-tech/keycard-shell#225](https://github.com/keycard-tech/keycard-shell/pull/225) |
 | SR-004 | Low | Generic OpenPGP helpers narrow some `size_t` lengths without explicit upper-bound rejection | Open — hardening |
@@ -102,8 +114,9 @@ Treat as trusted for the current design:
 No Critical or High-severity issue has been confirmed in the reviewed
 `CREATE_IDENTITY` path at this checkpoint.
 
-That statement is provisional until the remaining review and physical E2E
-testing are complete.
+Physical happy-path and practical negative-path E2E validation are complete.
+The Critical / High statement remains provisional until the remaining PR
+#225 -> #226 -> #227 source review and targeted regression work are complete.
 
 ---
 
@@ -111,10 +124,10 @@ testing are complete.
 
 **Severity:** Medium<br>
 **Confidence:** High<br>
-**Status:** Remediation submitted<br>
+**Status:** Remediation submitted; physical review/cancel flow verified; targeted timestamp regressions pending<br>
 **Tracking:** [keycard-tech/keycard-shell#227](https://github.com/keycard-tech/keycard-shell/pull/227)<br>
 **Implementation:** `098ca3c` — `openpgp: review host-provided creation time`<br>
-**Verified by:** release firmware builds and signs successfully; source-level control-flow review confirms creation-time approval occurs before `keycard_cmd_sign()`; physical Shell E2E remains pending
+**Verified by:** release firmware builds and signs successfully; source-level control-flow review confirms creation-time approval occurs before `keycard_cmd_sign()`; physical Shell beta3 displays UID, Unix creation time, and fingerprint; physical reject/cancel returns before certificate output; final certificate fingerprint matches the Shell-reviewed fingerprint
 
 ### Description
 
@@ -175,15 +188,15 @@ This remediation is implemented by commit `098ca3c` in
 - [x] release firmware builds successfully with `cmake --build --preset release`
 - [x] `git diff --check` passes
 - [x] source-level review confirms creation-time review occurs before Keycard signing
-- [ ] physical Shell review / cancellation behavior validated
-- [ ] final certificate timestamp and fingerprint validated in physical E2E
+- [x] physical Shell review / cancellation behavior validated
+- [x] final certificate fingerprint validated in physical E2E; timestamp-specific regression checks remain below
 
 ### Regression Tests
 
 - [ ] different unapproved creation times cannot silently create identities
 - [ ] approved creation time matches encoded primary-key creation time
 - [ ] approved creation time matches signature creation-time metadata
-- [ ] fingerprint produced after approval matches the final certificate
+- [x] fingerprint produced after approval matches the final certificate
 
 ---
 
@@ -276,7 +289,7 @@ This remediation is implemented by commit `493f962` in
 
 ### Regression Tests
 
-- [ ] normal OpenPGP path signs successfully
+- [x] normal OpenPGP path signs successfully on physical Shell beta3
 - [ ] maximum accepted 104-byte signing payload succeeds
 - [ ] oversized path is rejected before copying
 - [ ] rejected oversized path does not invoke signing
@@ -391,10 +404,10 @@ Both dependent branches therefore include the SR-003 remediation.
 
 ### Regression Tests
 
-- [ ] canonical signature `r` and `s` MPIs accepted
+- [x] canonical signature `r` and `s` MPIs accepted in the physical happy path
 - [ ] incorrect declared signature MPI bit length rejected
 - [ ] leading-zero non-canonical signature MPI rejected
-- [ ] canonical public-key point MPI accepted
+- [x] canonical public-key point MPI accepted in the physical happy path
 - [ ] incorrect public-key point MPI bit length rejected
 - [ ] oversized scalar rejected
 - [ ] truncated MPI rejected
@@ -556,8 +569,8 @@ Current implementation:
 
     m/43'/60'/1581'/5261136'/0
 
-Final child `x` semantics remain a policy question, but the host cannot select
-the path.
+For the current implementation, child `x = 0` is the acknowledged initial
+OpenPGP identity/key index. The host cannot select or override the path.
 
 ## Signing Before User Approval
 
@@ -567,8 +580,8 @@ The approval flow completes before `keycard_cmd_sign()` is reached.
 
 Cancel/reject returns before the signing operation.
 
-Physical hardware testing is still required to confirm the full UI/event
-behavior on the retail device.
+Physical beta3 hardware testing confirms that rejecting the trusted review
+returns cleanly before certificate output and leaves the Shell responsive.
 
 ## Ambiguous UID Display
 
@@ -607,17 +620,17 @@ cryptographic self-certification verification before returning the certificate.
 
 - [ ] finish PR #225 primitive review
 - [ ] finish PR #226 CBOR/request parser review
-- [ ] finish PR #227 orchestration review
+- [x] finish PR #227 orchestration review through current head `6f636d3`
 - [x] complete TLV/APDU parser review
 - [ ] review every error / cancellation path
 - [ ] review output-length failure hygiene
 - [ ] review stack/static-buffer bounds
-- [ ] review request/output heap aliasing
+- [x] review request/output heap aliasing
 - [ ] review malformed card responses
-- [ ] confirm final derivation-policy semantics
+- [x] confirm final derivation-policy semantics for current implementation (`x = 0` acknowledged)
 - [ ] add regression tests for accepted findings
-- [ ] run physical Shell E2E
-- [ ] run final GnuPG validation
+- [x] run physical Shell E2E
+- [x] run final GnuPG validation
 
 ---
 
@@ -630,11 +643,12 @@ The review is not considered complete until:
 - [ ] every Medium finding is fixed, accepted, or explicitly deferred with rationale
 - [ ] Low findings are fixed or explicitly documented
 - [x] pending TLV/APDU review is completed
-- [ ] cancellation/reject behavior is tested on physical hardware
-- [ ] malformed request behavior is tested on physical hardware
-- [ ] card/signing failure behavior is tested on physical hardware
-- [ ] returned certificate passes final interoperability validation
-- [ ] fingerprint shown by Shell matches the final certificate fingerprint
+- [x] cancellation/reject behavior is tested on physical hardware
+- [x] malformed request behavior is tested on physical hardware
+- [x] normal card-removal behavior is tested on physical hardware: Shell locks immediately
+- [ ] injected Keycard command/signing failure while the card remains present requires dedicated fault-injection/test support
+- [x] returned certificate passes final interoperability validation with GnuPG
+- [x] fingerprint shown by Shell matches the final certificate fingerprint
 
 ---
 

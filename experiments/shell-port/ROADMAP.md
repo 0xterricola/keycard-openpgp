@@ -2,7 +2,9 @@
 
 ## Overall Project
 
-`██████████████████████████████░░  ~95%`
+### CREATE_IDENTITY Phase
+
+`████████████████████████████████  100% ✅ PRACTICAL BETA3 HARDWARE VALIDATION COMPLETE`
 
 ### Goal
 
@@ -29,18 +31,29 @@
 ### Current State
 
 - [x] complete CREATE_IDENTITY software vertical slice
-- [x] runnable beta3 firmware build received from maintainer
-- [x] physical Keycard Shell CREATE_IDENTITY E2E
+- [x] runnable beta3 firmware received from Keycard maintainer
+- [x] physical Shell CREATE_IDENTITY happy-path E2E
 - [x] multipart animated `UR:BYTES` response reconstructed
 - [x] returned certificate accepted by GnuPG
-- [x] valid self-signature demonstrated on physical hardware
-- [x] current PR #227 maintainer review comments addressed
+- [x] valid self-signature demonstrated
+- [x] user reject / cancel path verified
+- [x] malformed CBOR request rejected safely
+- [x] unsupported protocol version rejected safely
+- [x] unsupported operation rejected safely
+- [x] valid request still works after negative parser tests
+- [x] card-removal behavior verified: Shell immediately locks
+- [x] current `x = 0` derivation policy acknowledged by Keycard maintainer
+- [x] current PR #227 review comments addressed
 - [ ] PR #227 maintainer re-review
-- [ ] remaining physical negative / cancellation-path validation
 - [ ] upstream PR stack merge
 
-The identity-creation happy path is now proven end-to-end on physical hardware.
-The next functional layer, `SIGN_MESSAGE`, is tracked separately below.
+The practical CREATE_IDENTITY beta3 hardware-validation phase is complete.
+
+A lower-level injected Keycard command/signing failure would require dedicated
+fault-injection or test support and is not a blocker for the completed physical
+validation above.
+
+The next functional layer is `SIGN_MESSAGE`, tracked separately below.
 
 ---
 
@@ -327,12 +340,22 @@ After #225 lands, `feature/openpgp-integration` can be rebased onto `master` so 
 
 ## Current Remaining Work
 
+- [x] physical CREATE_IDENTITY happy path verified
+- [x] user reject / cancel path verified
+- [x] malformed-request behavior verified
+- [x] unsupported-version behavior verified
+- [x] unsupported-operation behavior verified
+- [x] valid request regression-tested after negative requests
+- [x] card removal verified to trigger the normal Shell lock boundary
+- [x] current final child policy `x = 0` acknowledged by Keycard maintainer
+- [x] no hardware-only issue discovered in the practical beta3 test matrix
 - [ ] maintainer re-review of PR #227
-- [ ] maintainer confirmation of final child `x` semantics
-- [ ] confirm whether any additional Keycard key-type policy is required
-- [ ] verify remaining cancel / malformed-request / card-failure paths on hardware
-- [ ] address any hardware-only failure-path issues discovered
 - [ ] merge upstream PR stack
+
+Non-blocking future defensive work:
+
+- injected Keycard command/signing failure testing, if dedicated fault-injection
+  support becomes available
 
 ## PR Stack Note
 
@@ -397,23 +420,23 @@ long-term target.
 The purpose of the current PR stack is to make that specific hardware-backed
 workflow explicit, reviewable, and testable.
 
-## Future v6 Track
+## Future v6 Track — Non-blocking Backlog
 
 OpenPGP v6 should be investigated as a separate compatibility and standards
 track rather than silently changing the semantics of the current v4 PR stack.
 
-A future v6 investigation should determine:
+A future v6 investigation may determine:
 
-- [ ] which RFC 9580-compatible signing algorithm can be supported by Keycard
-- [ ] whether future standardized secp256k1 OpenPGP support becomes available
-- [ ] v6 public-key packet construction
-- [ ] SHA-256 / 32-byte v6 fingerprints
-- [ ] v6 key-ID semantics
-- [ ] salted v6 signature construction
-- [ ] v6 self-certification verification
-- [ ] interoperability with RFC 9580 implementations
-- [ ] whether the existing OpenPGP derivation namespace can remain unchanged
-- [ ] migration / coexistence policy between v4 and any future v6 identity
+- which RFC 9580-compatible signing algorithm can be supported by Keycard
+- whether future standardized secp256k1 OpenPGP support becomes available
+- v6 public-key packet construction
+- SHA-256 / 32-byte v6 fingerprints
+- v6 key-ID semantics
+- salted v6 signature construction
+- v6 self-certification verification
+- interoperability with RFC 9580 implementations
+- whether the existing OpenPGP derivation namespace can remain unchanged
+- migration / coexistence policy between v4 and any future v6 identity
 
 The current v4 work should remain usable as a documented interoperability
 implementation even if a separate v6 path is added later.
@@ -436,8 +459,13 @@ PR #225 -> #226 -> #227 data path, including parsing, display/signing binding,
 derivation-path ownership, memory safety, OpenPGP encoding, and failure paths.
 
 Physical Shell happy-path E2E validation has completed using the maintainer's
-beta3 firmware build. Negative, cancellation, malformed-request, and card-failure
-paths remain part of defensive hardware validation.
+beta3 firmware build. User rejection, malformed requests, unsupported versions,
+unsupported operations, post-negative recovery, and normal card-removal behavior
+have also been validated on physical hardware.
+
+A lower-level injected Keycard command/signing failure remains outside the
+practical hardware matrix because removing the card immediately triggers the
+Shell's normal lock boundary.
 
 ---
 
@@ -445,9 +473,9 @@ paths remain part of defensive hardware validation.
 
 **Purpose:** Shell-owned OpenPGP derivation path
 
-`█████████████████████████████░░░  ~90% 🟡 IMPLEMENTED / FINAL CHILD SEMANTICS PENDING`
+`████████████████████████████████  100% ✅ CURRENT POLICY RESOLVED`
 
-## Current Implemented Policy
+## Current Policy
 
     m/43'/60'/1581'/5261136'/0
 
@@ -455,8 +483,10 @@ where:
 
     5261136 = 0x504750 = "PGP"
 
-The final component is non-hardened. For the current implementation, child `0`
-is treated as the initial OpenPGP identity/key index.
+The final component is non-hardened.
+
+For the current implementation, child `0` is the initial OpenPGP identity/key
+index.
 
 ## Completed
 
@@ -468,38 +498,30 @@ is treated as the initial OpenPGP identity/key index.
 - [x] existing multisig EIP-1581 path identified
 - [x] multisig already owns `m/43'/60'/1581'/0'/0`
 - [x] OpenPGP does not silently reuse the multisig identity path
-- [x] maintainer proposed dedicated OpenPGP namespace:
+- [x] dedicated OpenPGP namespace established:
   `m/43'/60'/1581'/5261136'/x`
 - [x] `5261136 = 0x504750 = "PGP"`
-- [x] current implementation chooses `x = 0` for the initial identity
+- [x] current implementation uses `x = 0`
+- [x] current `x = 0` policy communicated to Keycard maintainer
+- [x] Keycard maintainer acknowledged the current child-zero policy
 - [x] path constants encoded in Shell
 - [x] no-argument `core_openpgp_run()` owns the production policy boundary
-- [x] menu/action binds to the Shell-owned policy
-- [x] path remains absent from the host request protocol
-- [x] implementation isolated so the final child policy can change without redesigning orchestration
+- [x] UI action binds to the Shell-owned policy
+- [x] derivation path remains absent from the host request protocol
 - [x] implementation commit: `761ebc3` — `openpgp: define identity derivation path`
-
-## Remaining
-
-- [ ] maintainer confirms exact meaning / policy for final child `x`
-- [ ] confirm whether any additional Keycard key-type policy is required
-- [ ] adjust the final child value/semantics if maintainer guidance differs from current `x = 0`
-- [ ] finalize documentation wording after confirmation
 
 ## Current Position
 
-The namespace question is resolved enough for implementation: OpenPGP has a
-dedicated EIP-1581 namespace proposed by the maintainer and Shell now encodes it.
+The derivation policy is resolved for the current OpenPGP v4 implementation.
 
-The only remaining policy uncertainty is the exact semantics of the final
-non-hardened child `x` (and whether any additional Keycard key-type policy is
-desired). The current code uses `x = 0` for the first identity and labels that
-interpretation as pending final maintainer confirmation.
+The Shell owns:
 
-This is no longer blocking the software vertical slice, menu wiring, or PR #227.
-If the maintainer requests a different child policy, the change is isolated to
-the Shell-owned policy layer.
+    m/43'/60'/1581'/5261136'/0
 
+The host cannot select or override it.
+
+Any future multi-identity policy can extend the final non-hardened child without
+changing the current CREATE_IDENTITY protocol boundary.
 
 # Shell UI + QR Integration
 
@@ -544,9 +566,33 @@ the Shell-owned policy layer.
 - [x] animated multipart response QR displayed
 - [x] physical response reconstructed by host tooling
 - [x] GnuPG validation passed
-- [ ] cancel/reject path verified on physical hardware
-- [ ] malformed-request failure behavior verified on physical hardware
-- [ ] card/signing failure behavior verified on physical hardware
+- [x] reject/cancel at trusted review returns cleanly to Extras
+- [x] rejected flow produces no certificate response QR
+- [x] malformed/truncated CBOR request returns cleanly to Extras
+- [x] unsupported protocol version returns cleanly to Extras
+- [x] unsupported operation returns cleanly to Extras
+- [x] invalid requests never reach trusted identity review
+- [x] invalid requests never produce a response certificate
+- [x] valid request still reaches trusted review after negative tests
+- [x] Shell remains responsive after all negative parser tests
+- [x] removing the Keycard triggers the normal device lock boundary
+
+Observed beta3 parser-failure UX:
+
+    scan invalid request
+            ↓
+    request rejected
+            ↓
+    no signing review
+            ↓
+    no response QR
+            ↓
+    return to Extras -> OpenPGP
+
+No explicit parser error message is currently shown for these rejected requests.
+
+Lower-level injected Keycard command failures are outside the practical physical
+test matrix because removing the Keycard immediately locks the Shell.
 
 ## Security Rule
 
@@ -642,9 +688,15 @@ Physical-test fingerprint:
 
 - [x] macOS physical E2E validated
 - [x] Linux instructions documented
-- [x] Windows instructions documented
-- [ ] Linux physical E2E independently validated
-- [ ] Windows physical E2E independently validated
+- [x] Windows / WSL instructions documented
+
+Optional portability validation:
+
+- Linux physical E2E may be independently validated by the Keycard team
+- Windows physical E2E may be independently validated in the future
+
+Linux and Windows physical validation are not blockers for the firmware,
+protocol, or completed macOS physical E2E.
 
 The host side is no longer a blocker for CREATE_IDENTITY.
 
@@ -652,11 +704,11 @@ The host side is no longer a blocker for CREATE_IDENTITY.
 
 # Final Device + GnuPG Validation
 
-`██████████████████████████████░░  ~95% ✅ HAPPY-PATH E2E COMPLETE`
+`████████████████████████████████  100% ✅ PRACTICAL BETA3 HARDWARE VALIDATION COMPLETE`
 
 ## Physical Shell beta3 E2E
 
-- [x] received runnable maintainer firmware build
+- [x] received runnable Keycard maintainer firmware build
 - [x] OpenPGP action available under Extras
 - [x] generated physical-test CREATE_IDENTITY request
 - [x] scanned request with physical Shell
@@ -694,12 +746,34 @@ Proof:
     RESPONSE STRUCTURE CHECK: PASS
     gpg: 1 good signature
 
-## Remaining Defensive Validation
+## Defensive Hardware Validation
 
-- [ ] cancel/reject path on physical hardware
-- [ ] malformed-request failure behavior
-- [ ] card/signing failure behavior
-- [ ] address any hardware-only failure-path issues discovered
+- [x] trusted-review reject/cancel path
+- [x] no certificate emitted after user rejection
+- [x] malformed/truncated CBOR request
+- [x] unsupported protocol version
+- [x] unsupported operation
+- [x] invalid requests do not reach signing review
+- [x] invalid requests do not emit certificate responses
+- [x] Shell remains usable after parser-negative tests
+- [x] known-good request succeeds after negative tests
+- [x] known-good post-negative request can be rejected normally
+- [x] Keycard removal triggers immediate device lock
+
+Observed behavior for malformed / unsupported OpenPGP requests is a clean return
+to `Extras -> OpenPGP` without an explicit parser-error screen.
+
+## Non-blocking Fault-injection Backlog
+
+A lower-level Keycard export/sign command failure while the card remains present
+has not been artificially injected.
+
+The normal physical card-removal path cannot exercise this because removing the
+Keycard immediately locks the Shell.
+
+Dedicated fault-injection or test-firmware support would be required to exercise
+that lower-level condition intentionally. It is not a blocker for the completed
+practical beta3 hardware validation.
 
 ## CREATE_IDENTITY Success Condition
 
@@ -735,7 +809,7 @@ Proof:
              v
       VALID SELF-SIGNATURE ✅
 
-The physical happy-path success condition has been met.
+The physical happy path and practical negative-path matrix have both passed.
 
 # Phase 2 — OpenPGP SIGN_MESSAGE
 
@@ -845,12 +919,12 @@ The prototype used OpenPGP signature type:
 
 ## Current Thurin Coordination
 
-- [x] CREATE_IDENTITY architecture shared with Ben
+- [x] CREATE_IDENTITY architecture shared with Thurin maintainer
 - [x] working Shell host `UR:BYTES` implementation shared
 - [x] proposed SIGN_MESSAGE request shape shared
 - [x] proposed detached-signature response discussed
 - [x] direct Thurin -> Shell QR architecture discussed
-- [ ] Ben checks compatibility with `identity-kit` and current PGP flow
+- [ ] Thurin maintainer checks compatibility with `identity-kit` and current PGP flow
 - [ ] freeze request/response schema
 - [ ] implement Shell SIGN_MESSAGE
 - [ ] extend host E2E tooling
@@ -923,7 +997,7 @@ contains only its intended delta.
             ↓
     trusted Shell orchestration                ✅
             ↓
-    Shell-owned OpenPGP derivation policy      ✅
+    Shell-owned derivation policy              ✅ x = 0 ACKNOWLEDGED
             ↓
     Extras -> OpenPGP action                   ✅
             ↓
@@ -941,35 +1015,37 @@ contains only its intended delta.
             ↓
     Keycard certification signature            ✅
             ↓
-    positive UID certification packet          ✅
-            ↓
     certificate assembly                       ✅
-            ↓
-    fingerprint / issuer binding               ✅
             ↓
     cryptographic self-verification            ✅
             ↓
-    dedicated UR:BYTES request                 ✅
-            ↓
     animated multipart UR:BYTES response       ✅
             ↓
-    physical beta3 Shell E2E                   ✅
+    physical beta3 happy-path E2E              ✅
             ↓
     host multipart reconstruction              ✅
             ↓
     GnuPG valid self-signature                 ✅
             ↓
-    maintainer review feedback                 ✅
+    reject / cancel path                       ✅
             ↓
-    review cleanup                             ✅
+    malformed CBOR rejection                   ✅
             ↓
-    PR #227 body / verification updated        ✅
+    unsupported version rejection              ✅
+            ↓
+    unsupported operation rejection            ✅
+            ↓
+    post-negative valid-request regression     ✅
+            ↓
+    Keycard removal -> Shell lock              ✅
             ↓
     +-----------------------------------------+
-    | PR #227 MAINTAINER RE-REVIEW           |
-    |                                         |
-    |      ← IDENTITY FLOW IS HERE           |
+    | PRACTICAL BETA3 VALIDATION COMPLETE     |
     +-----------------------------------------+
+            ↓
+    PR #227 maintainer re-review               ⏳
+            ↓
+    upstream merge                             ⏳
 
 Parallel next layer:
 
@@ -985,10 +1061,6 @@ Parallel next layer:
             ↓
     first hardware-backed Thurin claim         ⬜
 
-Parallel policy item still pending:
-
-    maintainer confirms exact child x semantics / key-type policy ⏳
-
 # Project Snapshot
 
     PR #225 — OpenPGP primitives
@@ -1001,56 +1073,76 @@ Parallel policy item still pending:
 
     PR #227 — identity creation + Shell integration
     ████████████████████████████████ 100% ✅
-    IMPLEMENTATION COMPLETE / PHYSICAL E2E PASS / RE-REVIEW PENDING
+    IMPLEMENTATION + PRACTICAL HARDWARE VALIDATION COMPLETE
+    MAINTAINER RE-REVIEW / MERGE PENDING
 
     Derivation policy
-    █████████████████████████████░░░  90% 🟡
-    NAMESPACE + x=0 IMPLEMENTED / FINAL x SEMANTICS PENDING
+    ████████████████████████████████ 100% ✅
+    x=0 POLICY ACKNOWLEDGED / CURRENT POLICY RESOLVED
 
     Shell UI + QR integration
     ████████████████████████████████ 100% ✅
-    EXTRAS ACTION + PHYSICAL QR HAPPY PATH COMPLETE
+    EXTRAS ACTION + POSITIVE AND NEGATIVE HARDWARE FLOWS VERIFIED
 
     Host E2E tooling
     ████████████████████████████████ 100% ✅
-    MULTIPART PHYSICAL E2E COMPLETE / PR #36 MERGED
+    MULTIPART PHYSICAL E2E COMPLETE / TESTER DOCS ON MAIN
 
     Device + GnuPG E2E
-    ██████████████████████████████░░  95% ✅
-    HAPPY PATH COMPLETE / DEFENSIVE FAILURE PATHS REMAIN
+    ████████████████████████████████ 100% ✅
+    PRACTICAL BETA3 HARDWARE VALIDATION COMPLETE
+
+    Linux / Windows portability
+    OPTIONAL
+    INSTRUCTIONS DOCUMENTED / PHYSICAL VALIDATION NON-BLOCKING
+
+    OpenPGP v6
+    FUTURE NON-BLOCKING RESEARCH TRACK
 
     SIGN_MESSAGE
     ███░░░░░░░░░░░░░░░░░░░░░░░░░░░  DESIGN 🟡
     STACKED BRANCH CREATED / THURIN PROTOCOL ALIGNMENT PENDING
-
-    CREATE_IDENTITY overall
-    ██████████████████████████████░░  95% ✅
-    PHYSICAL VERTICAL SLICE COMPLETE / UPSTREAM RE-REVIEW + MERGE REMAIN
 
 ## Next Checkbox
 
 ### CREATE_IDENTITY / PR #227
 
 - [x] host CREATE_IDENTITY request / response QR tooling
-- [x] maintainer proposes dedicated OpenPGP namespace
+- [x] dedicated OpenPGP namespace
   `m/43'/60'/1581'/5261136'/x`
-- [x] implement current `x = 0` Shell-owned policy
+- [x] implement `x = 0` Shell-owned policy
+- [x] Keycard maintainer acknowledges current child-zero policy
 - [x] bind policy to `core_openpgp_run()`
 - [x] add OpenPGP action under Extras
 - [x] release-build the complete software flow
 - [x] open upstream PR #227
 - [x] receive runnable beta3 firmware build
-- [x] run physical Shell CREATE_IDENTITY E2E
+- [x] run physical Shell CREATE_IDENTITY happy-path E2E
 - [x] reconstruct animated multipart response
 - [x] validate returned certificate with GnuPG
 - [x] receive maintainer review
 - [x] address all current maintainer review comments
 - [x] update PR body with physical E2E result
+- [x] verify trusted-review reject/cancel path
+- [x] verify malformed/truncated CBOR rejection
+- [x] verify unsupported-version rejection
+- [x] verify unsupported-operation rejection
+- [x] verify no invalid request reaches signing review
+- [x] verify no invalid request emits a certificate response
+- [x] verify Shell remains usable after negative tests
+- [x] regression-test a known-good request after negative tests
+- [x] verify card removal triggers normal Shell lock behavior
+- [x] complete practical beta3 hardware-validation matrix
 - [ ] maintainer re-review
-- [ ] maintainer confirms final child `x` semantics / any additional key-type policy
-- [ ] verify cancel / malformed-request / card-failure behavior on hardware
-- [ ] address any hardware-only failure-path issues discovered
 - [ ] review / merge PR #225, then #226, then #227
+
+Non-blocking:
+
+- injected lower-level Keycard command failure testing if dedicated fault-injection
+  support becomes available
+- optional independent Linux physical E2E
+- optional independent Windows physical E2E
+- future OpenPGP v6 investigation
 
 ### SIGN_MESSAGE
 
@@ -1059,9 +1151,9 @@ Parallel policy item still pending:
 - [x] inspect previous Thurin hardware-attestation experiment
 - [x] propose version-1 SIGN_MESSAGE CBOR shape
 - [x] explain two-timestamp v4 identity/signature model
-- [x] share Shell PR + host UR tooling with Ben
+- [x] share Shell PR + host UR tooling with Thurin maintainer
 - [x] discuss direct Thurin -> Shell `UR:BYTES` QR flow
-- [ ] receive Ben's identity-kit / PGP compatibility feedback
+- [ ] receive Thurin maintainer identity-kit / PGP compatibility feedback
 - [ ] freeze request/response schema
 - [ ] implement protocol parsing
 - [ ] implement trusted message review

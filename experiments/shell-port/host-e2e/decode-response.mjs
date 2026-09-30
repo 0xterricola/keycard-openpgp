@@ -97,40 +97,60 @@ function parsePackets(data) {
   return packets;
 }
 
-function readUrInput(arg) {
-  if (arg.startsWith("ur:")) {
-    return arg.trim();
-  }
+function readUrParts(arg) {
+  let text;
 
-  if (/\.(png|jpg|jpeg)$/i.test(arg)) {
-    return execFileSync(
+  if (arg.startsWith("ur:")) {
+    text = arg;
+  } else if (/\.(png|jpg|jpeg)$/i.test(arg)) {
+    text = execFileSync(
       "zbarimg",
       ["--raw", arg],
       { encoding: "utf8" }
-    ).trim();
+    );
+  } else {
+    text = readFileSync(arg, "utf8");
   }
 
-  return readFileSync(arg, "utf8").trim();
+  return text
+    .split(/\r?\n/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
 }
 
-if (process.argv.length !== 3) {
+if (process.argv.length < 3) {
   console.error(
-    "usage: node decode-response.mjs <ur-text | ur-file | qr-image>"
+    "usage: node decode-response.mjs <ur-text | ur-file | qr-image> [...]"
   );
   process.exit(1);
 }
 
-const urText = readUrInput(process.argv[2]);
+const decoder = new URDecoder();
+let received = 0;
 
-if (!urText.toLowerCase().startsWith("ur:bytes/")) {
-  throw new Error("expected UR:BYTES response");
+for (const arg of process.argv.slice(2)) {
+  for (const part of readUrParts(arg)) {
+    if (!part.toLowerCase().startsWith("ur:bytes/")) {
+      throw new Error(`expected UR:BYTES response, got: ${part.slice(0, 32)}`);
+    }
+
+    decoder.receivePart(part);
+    received++;
+
+    if (decoder.isComplete()) {
+      break;
+    }
+  }
+
+  if (decoder.isComplete()) {
+    break;
+  }
 }
 
-const decoder = new URDecoder();
-decoder.receivePart(urText);
-
 if (!decoder.isComplete()) {
-  throw new Error("multipart UR response is incomplete");
+  throw new Error(
+    `multipart UR response is incomplete after ${received} frame(s)`
+  );
 }
 
 if (!decoder.isSuccess()) {

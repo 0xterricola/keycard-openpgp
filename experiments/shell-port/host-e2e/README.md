@@ -17,8 +17,10 @@ The test does this:
               ↓
          Keycard Shell
               ↓
-       Shell creates an
-      OpenPGP certificate
+       Shell derives an
+        OpenPGP key
+              ↓
+      creates certificate
               ↓
       animated response QR
               ↓

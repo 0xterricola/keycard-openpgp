@@ -1,8 +1,10 @@
 # Keycard Shell OpenPGP CREATE_IDENTITY Demo — macOS
 
-This is the short recording runbook for demonstrating `CREATE_IDENTITY` on a physical Keycard Shell.
+`CREATE_IDENTITY` creates a public OpenPGP identity for the Shell’s own derived key by binding a UID to its public key with a self-certification.
 
-The goal is to show the complete hardware flow quickly:
+This is the macOS runbook for demonstrating `CREATE_IDENTITY` on a physical Keycard Shell.
+
+The goal is to show the complete hardware flow:
 
 ```text
 CREATE_IDENTITY request
@@ -54,9 +56,9 @@ This establishes the Shell's own OpenPGP identity. Later operations such as `SIG
 
 ---
 
-# 1. PRE-DEMO SETUP
+# 1. SETUP
 
-Do this **before recording**.
+Do this first.
 
 ```bash
 cd ~/Developer/keycard-openpgp/experiments/shell-port/host-e2e
@@ -76,11 +78,10 @@ mkdir -p /tmp/openpgp-frames
 mkdir -m 700 /tmp/keycard-openpgp-gnupg
 ```
 
-Do not show dependency installation, version checks, or cleanup during the recording.
 
 ---
 
-# 2. START RECORDING — GENERATE REQUEST
+# 2. GENERATE REQUEST
 
 Generate a fresh Unix creation timestamp and create the request:
 
@@ -130,7 +131,7 @@ Fingerprint
 <OpenPGP fingerprint>
 ```
 
-Pause briefly so the trusted review is visible.
+Review the displayed values.
 
 Approve the request.
 
@@ -217,7 +218,7 @@ Where:
 
 # 6. FINAL GnuPG VERIFICATION
 
-Do not waste recording time on `show-only`, `--list-keys`, or packet dumps.
+Skip redundant `show-only`, `--list-keys`, and packet-dump steps.
 
 Import the reconstructed certificate into the isolated GnuPG home:
 
@@ -239,17 +240,13 @@ The final success condition is:
 gpg: 1 good signature
 ```
 
-Once that appears:
-
-```text
-END RECORDING
-```
+Once that appears, the end-to-end flow has passed.
 
 ---
 
 # SPEED-RUN FLOW
 
-The entire recorded demo is:
+The complete flow is:
 
 ```text
 generate CREATE_IDENTITY request
@@ -289,50 +286,4 @@ END
 
 ---
 
-# SHORT NARRATION
-
-```text
-This is CREATE_IDENTITY running on a physical Keycard Shell.
-
-The Shell already has its own derived private key. CREATE_IDENTITY turns the public side of that key into a proper OpenPGP identity by binding a requested UID to it with a self-certification.
-
-The host sends the UID and creation timestamp as a QR request.
-
-The Shell derives its matching public key and shows the UID, creation time, and fingerprint in the trusted review.
-
-After approval, the Shell creates the self-certification and returns the complete public OpenPGP certificate as an animated BC-UR QR.
-
-The host reconstructs that certificate as a public key packet, user ID packet, and certification signature.
-
-Finally, GnuPG independently verifies the self-signature.
-
-The private key never leaves the Shell.
-```
-
 ---
-
-# ONLY IF CAPTURE IS INCOMPLETE
-
-If decoding reports:
-
-```text
-multipart UR response is incomplete
-```
-
-repeat the capture with 20 seconds instead of 12:
-
-```bash
-rm -rf /tmp/openpgp-frames
-mkdir -p /tmp/openpgp-frames
-
-ffmpeg \
-  -f avfoundation \
-  -framerate 30 \
-  -pixel_format uyvy422 \
-  -i "0:none" \
-  -t 20 \
-  -vf "fps=10,scale=720:-1" \
-  /tmp/openpgp-frames/frame-%04d.png
-```
-
-Then repeat the ZBar and decode steps.

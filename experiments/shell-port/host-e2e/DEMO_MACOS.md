@@ -1,18 +1,30 @@
-# Keycard Shell OpenPGP Demo — macOS
+# Keycard Shell OpenPGP CREATE_IDENTITY Demo — macOS
 
-This is a short recording runbook for demonstrating the Keycard Shell `CREATE_IDENTITY` OpenPGP flow on macOS.
+This is the short recording runbook for demonstrating `CREATE_IDENTITY` on a physical Keycard Shell.
 
-It is intentionally narrower than the full host E2E README: this file is for staging and recording a clean demo.
+The goal is to show the complete hardware flow quickly:
 
-## What `CREATE_IDENTITY` means
+```text
+CREATE_IDENTITY request
+        ↓
+Shell trusted review
+        ↓
+Shell creates its OpenPGP identity
+        ↓
+animated certificate QR
+        ↓
+host reconstructs certificate
+        ↓
+GnuPG verifies self-certification
+```
 
-`CREATE_IDENTITY` does **not** import somebody else's OpenPGP key and it does not change the Shell's private key.
+## What CREATE_IDENTITY means
 
-The Shell already has a private key derived from its own fixed OpenPGP derivation path. From that private key it can derive the matching public key.
+The Shell already has a private key derived from its fixed OpenPGP derivation path.
 
-The purpose of `CREATE_IDENTITY` is to turn that Shell-derived key into a proper public OpenPGP identity certificate.
+`CREATE_IDENTITY` does **not** import somebody else's key and does not replace the Shell's private key.
 
-Conceptually:
+Instead:
 
 ```text
 Shell-derived private key
@@ -20,15 +32,13 @@ Shell-derived private key
         └── derives matching public key
                     │
                     + requested UID
-                      "Keycard Test <keycard@example.com>"
                     │
-                    + self-certification made by
-                      the same Shell private key
+                    + self-certification
                     ↓
              OpenPGP certificate
 ```
 
-The returned certificate contains the public side of that identity:
+The returned public certificate contains:
 
 ```text
 Public Key packet
@@ -38,140 +48,65 @@ Self-certification Signature packet
 
 The private key never leaves the Shell.
 
-The self-certification means, in effect:
+The self-certification proves that the holder of the corresponding private key approved the binding between this public key and this UID.
 
-> the holder of the private key corresponding to this public key approved this UID binding.
-
-After the host saves the returned certificate, other software can use its public key and fingerprint to verify future signatures made by the same Shell-derived private key.
-
-This is different from the earlier external-certification experiment, where the Shell certified another party's existing public key and UID. In this demo, the Shell is establishing **its own** OpenPGP identity.
-
-That makes `CREATE_IDENTITY` the foundation for later operations such as:
-
-```text
-SIGN_MESSAGE
-    → sign an approved statement with this same Shell-derived key
-
-external certification
-    → use this Shell identity to certify another OpenPGP key/UID
-```
-
-## Demo goal
-
-Show the complete flow:
-
-```text
-host asks the Shell to create an OpenPGP identity
-        ↓
-request contains UID + creation time
-        ↓
-request QR
-        ↓
-Keycard Shell trusted review
-        ↓
-Shell derives its own OpenPGP public key
-        ↓
-Shell binds the requested UID to that key
-with a self-certification
-        ↓
-complete public OpenPGP certificate
-        ↓
-animated UR:BYTES response
-        ↓
-host reconstructs and saves certificate
-        ↓
-GnuPG verifies the self-signature
-        ↓
-PASS
-```
-
-The trusted review on the current beta3 firmware should show:
-
-```text
-UID
-Keycard Test <keycard@example.com>
-
-Unix time
-<Unix timestamp>
-
-Fingerprint
-<40 hex characters>
-```
-
-Note: human-readable UTC rendering has been implemented in the newer OpenPGP orchestration branch, but it is not present on the beta3 firmware used for this demo.
+This establishes the Shell's own OpenPGP identity. Later operations such as `SIGN_MESSAGE` can use the same Shell-derived key.
 
 ---
 
-# 1. Pre-demo setup
+# 1. PRE-DEMO SETUP
 
-Use the existing host E2E directory:
-
-```bash
-cd ~/Developer/keycard-openpgp/experiments/shell-port/host-e2e
-```
-
-Confirm the required tools are available:
-
-```bash
-node --version
-npm --version
-qrencode --version
-gpg --version
-zbarimg --version
-ffmpeg -version | head -1
-```
-
-Install JavaScript dependencies if needed:
-
-```bash
-npm ci
-```
-
-For the cleanest recording, close unrelated terminal windows and clear old demo files:
-
-```bash
-rm -f   /tmp/openpgp-create-identity.ur   /tmp/openpgp-create-identity.png   /tmp/openpgp-response-frames.txt   /tmp/openpgp-response-frames-unique.txt   /tmp/openpgp-created-identity.pgp
-
-rm -rf   /tmp/openpgp-frames   /tmp/keycard-openpgp-gnupg
-```
-
----
-
-# 2. Generate the request
-
-Generate the request immediately before recording so the creation time is easy to sanity-check on the Shell:
+Do this **before recording**.
 
 ```bash
 cd ~/Developer/keycard-openpgp/experiments/shell-port/host-e2e
 
+rm -rf \
+  /tmp/openpgp-frames \
+  /tmp/keycard-openpgp-gnupg
+
+rm -f \
+  /tmp/openpgp-create-identity.ur \
+  /tmp/openpgp-create-identity.png \
+  /tmp/openpgp-response-frames.txt \
+  /tmp/openpgp-response-frames-unique.txt \
+  /tmp/openpgp-created-identity.pgp
+
+mkdir -p /tmp/openpgp-frames
+mkdir -m 700 /tmp/keycard-openpgp-gnupg
+```
+
+Do not show dependency installation, version checks, or cleanup during the recording.
+
+---
+
+# 2. START RECORDING — GENERATE REQUEST
+
+Generate a fresh Unix creation timestamp and create the request:
+
+```bash
 TS=$(date +%s)
 
-node generate-request.mjs   "Keycard Test <keycard@example.com>"   "$TS"
+node generate-request.mjs \
+  "Keycard Test <keycard@example.com>" \
+  "$TS"
 ```
 
-Expected final line:
+Show:
 
 ```text
 REQUEST SELF-CHECK: PASS
 ```
 
-The generated QR is:
-
-```text
-/tmp/openpgp-create-identity.png
-```
-
-Open it:
+Open the QR:
 
 ```bash
 open /tmp/openpgp-create-identity.png
 ```
 
-Leave the QR visible and large enough for the Shell camera to scan.
-
 ---
 
-# 3. Record the Shell request flow
+# 3. KEYCARD SHELL
 
 On the Shell:
 
@@ -180,113 +115,78 @@ Extras
   → OpenPGP
 ```
 
-Scan the request QR.
+Scan the QR displayed on the Mac.
 
-The trusted review on this firmware should show the same request information:
+The current beta3 firmware should show:
 
 ```text
 UID
 Keycard Test <keycard@example.com>
 
 Unix time
-<Unix timestamp>
+<creation timestamp>
 
 Fingerprint
 <OpenPGP fingerprint>
 ```
 
-For the recording, pause briefly on each page so the values are readable.
+Pause briefly so the trusted review is visible.
 
 Approve the request.
 
-The Shell should create the OpenPGP identity certificate and then display an animated `UR:BYTES` response QR.
+The Shell creates the OpenPGP certificate and displays an animated `UR:BYTES` response QR.
 
-Keep that animated response QR open.
+Keep the animated QR open.
 
 ---
 
-# 4. Capture the animated response on macOS
+# 4. CAPTURE THE ANIMATED RESPONSE
 
-List available cameras:
+Hold the Shell steady in front of the MacBook camera.
 
-```bash
-ffmpeg -f avfoundation -list_devices true -i "" 2>&1 |   sed -n '/AVFoundation video devices:/,/AVFoundation audio devices:/p'
-```
-
-If the MacBook camera is device `0`, prepare the frame directory:
+Capture 12 seconds:
 
 ```bash
 rm -rf /tmp/openpgp-frames
 mkdir -p /tmp/openpgp-frames
+
+ffmpeg \
+  -f avfoundation \
+  -framerate 30 \
+  -pixel_format uyvy422 \
+  -i "0:none" \
+  -t 12 \
+  -vf "fps=10,scale=720:-1" \
+  /tmp/openpgp-frames/frame-%04d.png
 ```
 
-Hold the Shell steady in front of the MacBook camera with the animated response QR visible.
-
-Capture 30 seconds and extract 15 frames per second:
-
-```bash
-ffmpeg   -f avfoundation   -framerate 30   -i "0:none"   -t 30   -vf "fps=15"   /tmp/openpgp-frames/frame-%05d.png
-```
-
-If the MacBook camera has a different device number, replace `0`.
+This assumes the MacBook camera is AVFoundation device `0`, which is the device used in the tested setup.
 
 ---
 
-# 5. Extract unique UR fragments
+# 5. EXTRACT AND DECODE THE RESPONSE
 
-Create a fresh fragment file:
-
-```bash
-: > /tmp/openpgp-response-frames.txt
-```
-
-Run ZBar over the captured images:
+Run ZBar once across all captured frames and deduplicate the BC-UR fragments:
 
 ```bash
-for f in /tmp/openpgp-frames/*.png; do
-  zbarimg     --set '*.disable'     --set 'qrcode.enable'     --raw     "$f"     2>/dev/null >> /tmp/openpgp-response-frames.txt || true
-done
+zbarimg \
+  --set '*.disable' \
+  --set 'qrcode.enable' \
+  --raw \
+  /tmp/openpgp-frames/*.png \
+  2>/dev/null |
+awk '/^[Uu][Rr]:[Bb][Yy][Tt][Ee][Ss]\// && !seen[$0]++' \
+  > /tmp/openpgp-response-frames-unique.txt
 ```
 
-Keep only unique `UR:BYTES` fragments:
+Decode immediately:
 
 ```bash
-awk '/^[Uu][Rr]:[Bb][Yy][Tt][Ee][Ss]\// && !seen[$0]++'   /tmp/openpgp-response-frames.txt   > /tmp/openpgp-response-frames-unique.txt
+node decode-response.mjs \
+  /tmp/openpgp-response-frames-unique.txt
 ```
 
-Check the count:
-
-```bash
-wc -l /tmp/openpgp-response-frames-unique.txt
-```
-
-Optionally inspect the first few:
-
-```bash
-head -5 /tmp/openpgp-response-frames-unique.txt
-```
-
-Valid fragments begin with:
-
-```text
-UR:BYTES/
-```
-
-The fragments do not need to arrive in order. The Shell uses BC-UR fountain encoding.
-
----
-
-# 6. Decode the Shell response
-
-Run:
-
-```bash
-cd ~/Developer/keycard-openpgp/experiments/shell-port/host-e2e
-
-node decode-response.mjs   /tmp/openpgp-response-frames-unique.txt
-```
-
-A successful result should look similar to:
+Show the result:
 
 ```text
 Recovered certificate: 236 bytes
@@ -298,13 +198,14 @@ RESPONSE STRUCTURE CHECK: PASS
 
 The exact certificate size may differ.
 
-The important line is:
+The important results are:
 
 ```text
+Packet sequence: 6 -> 13 -> 2
 RESPONSE STRUCTURE CHECK: PASS
 ```
 
-Expected packet sequence:
+Where:
 
 ```text
 6  = Public Key
@@ -314,137 +215,103 @@ Expected packet sequence:
 
 ---
 
-# 7. Inspect and verify with GnuPG
+# 6. FINAL GnuPG VERIFICATION
 
-Inspect the certificate without importing it into the normal keyring:
+Do not waste recording time on `show-only`, `--list-keys`, or packet dumps.
 
-```bash
-gpg   --import-options show-only   --import   /tmp/openpgp-created-identity.pgp
-```
-
-For the final verification, use an isolated GnuPG home:
+Import the reconstructed certificate into the isolated GnuPG home:
 
 ```bash
-rm -rf /tmp/keycard-openpgp-gnupg
-mkdir -m 700 /tmp/keycard-openpgp-gnupg
+GNUPGHOME=/tmp/keycard-openpgp-gnupg \
+  gpg --import /tmp/openpgp-created-identity.pgp
 ```
 
-Import the certificate:
+Verify the self-certification:
 
 ```bash
-GNUPGHOME=/tmp/keycard-openpgp-gnupg   gpg --import /tmp/openpgp-created-identity.pgp
+GNUPGHOME=/tmp/keycard-openpgp-gnupg \
+  gpg --check-sigs
 ```
 
-Show the fingerprint:
-
-```bash
-GNUPGHOME=/tmp/keycard-openpgp-gnupg   gpg --list-keys --with-fingerprint
-```
-
-Verify the certification signature:
-
-```bash
-GNUPGHOME=/tmp/keycard-openpgp-gnupg   gpg --check-sigs
-```
-
-Final success condition:
-
-```text
-[self-signature]
-```
-
-and:
+The final success condition is:
 
 ```text
 gpg: 1 good signature
 ```
 
----
-
-# 8. Recording shot list
-
-## Meta glasses / physical footage
-
-Capture:
-
-1. Shell in hand.
-2. `Extras → OpenPGP`.
-3. Shell scanning the request QR on the Mac.
-4. Trusted review:
-   - UID
-   - raw Unix creation time
-   - fingerprint
-5. Approval.
-6. Animated response QR appearing on the Shell.
-
-Keep the Shell screen square to the glasses/camera and pause long enough for each review field to be readable.
-
-## Mac screen footage
-
-Capture:
-
-1. Request generation ending in:
-
-   ```text
-   REQUEST SELF-CHECK: PASS
-   ```
-
-2. Response decoding ending in:
-
-   ```text
-   RESPONSE STRUCTURE CHECK: PASS
-   ```
-
-3. GnuPG fingerprint output.
-4. Final:
-
-   ```text
-   gpg: 1 good signature
-   ```
-
----
-
-# 9. Suggested narration
-
-Keep narration short.
-
-Possible sequence:
+Once that appears:
 
 ```text
-This is the CREATE_IDENTITY flow running on a physical Keycard Shell.
-
-The Shell already has its own derived private key. CREATE_IDENTITY turns the public side of that key into a proper OpenPGP identity certificate by binding a requested user ID to it with a self-certification.
-
-The host only sends the UID and creation timestamp. It does not send a private key or an existing public key for the Shell to adopt.
-
-The Shell derives its matching OpenPGP public key, shows the UID, raw Unix creation time, and fingerprint in the trusted review, and only creates the certification signature after approval.
-
-The private key never leaves the Shell.
-
-The finished public certificate contains a public key packet, user ID packet, and self-certification signature packet, and is returned as an animated BC-UR QR.
-
-Back on the host, the response is reconstructed and saved as a standard OpenPGP certificate.
-
-Finally, GnuPG independently verifies the self-signature, proving that the UID is correctly bound to the Shell-derived key.
+END RECORDING
 ```
 
 ---
 
-# 10. If QR capture fails
+# SPEED-RUN FLOW
 
-If no valid fragments were captured:
+The entire recorded demo is:
 
-```bash
-wc -l /tmp/openpgp-response-frames-unique.txt
+```text
+generate CREATE_IDENTITY request
+        ↓
+REQUEST SELF-CHECK: PASS
+        ↓
+open request QR
+        ↓
+Shell: Extras → OpenPGP
+        ↓
+scan
+        ↓
+show UID / Unix time / fingerprint
+        ↓
+approve
+        ↓
+animated response QR
+        ↓
+12-second camera capture
+        ↓
+ZBar extract
+        ↓
+decode
+        ↓
+6 -> 13 -> 2
+        ↓
+RESPONSE STRUCTURE CHECK: PASS
+        ↓
+GnuPG import
+        ↓
+GnuPG check-sigs
+        ↓
+gpg: 1 good signature
+        ↓
+END
 ```
 
-If the count is `0`, repeat the camera capture while:
+---
 
-- keeping the Shell steadier
-- reducing glare
-- keeping the screen square to the camera
-- moving the Shell slightly closer or farther away
-- making the QR occupy more of the camera frame
+# SHORT NARRATION
+
+```text
+This is CREATE_IDENTITY running on a physical Keycard Shell.
+
+The Shell already has its own derived private key. CREATE_IDENTITY turns the public side of that key into a proper OpenPGP identity by binding a requested UID to it with a self-certification.
+
+The host sends the UID and creation timestamp as a QR request.
+
+The Shell derives its matching public key and shows the UID, creation time, and fingerprint in the trusted review.
+
+After approval, the Shell creates the self-certification and returns the complete public OpenPGP certificate as an animated BC-UR QR.
+
+The host reconstructs that certificate as a public key packet, user ID packet, and certification signature.
+
+Finally, GnuPG independently verifies the self-signature.
+
+The private key never leaves the Shell.
+```
+
+---
+
+# ONLY IF CAPTURE IS INCOMPLETE
 
 If decoding reports:
 
@@ -452,26 +319,20 @@ If decoding reports:
 multipart UR response is incomplete
 ```
 
-capture for longer, for example 60 seconds:
+repeat the capture with 20 seconds instead of 12:
 
 ```bash
-ffmpeg   -f avfoundation   -framerate 30   -i "0:none"   -t 60   -vf "fps=15"   /tmp/openpgp-frames/frame-%05d.png
+rm -rf /tmp/openpgp-frames
+mkdir -p /tmp/openpgp-frames
+
+ffmpeg \
+  -f avfoundation \
+  -framerate 30 \
+  -pixel_format uyvy422 \
+  -i "0:none" \
+  -t 20 \
+  -vf "fps=10,scale=720:-1" \
+  /tmp/openpgp-frames/frame-%04d.png
 ```
 
-Then repeat fragment extraction and decoding.
-
----
-
-# Demo finish line
-
-The demo is complete when all three are visible:
-
-```text
-REQUEST SELF-CHECK: PASS
-RESPONSE STRUCTURE CHECK: PASS
-gpg: 1 good signature
-```
-
-That demonstrates the complete macOS → Keycard Shell → self-certified OpenPGP identity → macOS verification path.
-
-The important conceptual result is that the demo leaves you with a saved **public OpenPGP certificate** for the Shell-derived key. The Shell keeps the corresponding private key and can later use it for operations such as message signing.
+Then repeat the ZBar and decode steps.

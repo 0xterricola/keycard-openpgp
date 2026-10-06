@@ -9,6 +9,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@keystonehq/bc-ur-registry": "^0.7.1",
+    "@keystonehq/bc-ur-registry-eth": "^0.21.0",
     "@ngraveio/bc-ur": "^1.1.13",
     "cbor2": "^2.3.0"
   }

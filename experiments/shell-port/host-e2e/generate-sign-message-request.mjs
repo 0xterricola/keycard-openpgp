@@ -9,7 +9,7 @@ const verbose = process.env.DEMO_VERBOSE === "1";
 
 const VERSION = 1;
 const SIGN_MESSAGE = 2;
-const MESSAGE_MAX_LEN = 104;
+const MESSAGE_MAX_LEN = 255;
 
 const messageText = process.argv[2];
 const keyCreationTimeText = process.argv[3];

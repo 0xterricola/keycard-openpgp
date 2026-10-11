@@ -1,0 +1,21 @@
+From: Keycard Test <keycard@example.com>
+To: Keycard Test <keycard@example.com>
+Subject: ShellPGP Thunderbird signing test
+MIME-Version: 1.0
+Content-Type: multipart/signed; protocol="application/pgp-signature"; micalg=pgp-sha256; boundary="shellpgp-signed-boundary-001"
+
+--shellpgp-signed-boundary-001
+Content-Type: text/plain; charset=us-ascii
+
+Hello from Keycard Shell.
+--shellpgp-signed-boundary-001
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+wnUEARMIAB0WIQQH2FOfJpWDwWDjMxUXY+Fe0+kobAUCasshqAAKCRAXY+Fe0+ko
+bJO6AQDim5QmiVofFY5rmOVohvtCq4LthkplefXU5BT1mp3/8gD+OMweC2CFS3D3
+o9K1EwrbaGrDwYF92Dti8Lg+T6nvt1g=
+-----END PGP SIGNATURE-----
+--shellpgp-signed-boundary-001--

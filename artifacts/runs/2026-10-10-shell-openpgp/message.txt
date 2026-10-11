@@ -1,0 +1,1 @@
+Keycard Shell OpenPGP detached signature test

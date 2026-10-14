@@ -1,35 +1,74 @@
 # keycard-openpgp
 
-**Experimental trusted signing architecture: OpenPGP first, with Keycard Shell as the intended portable interface.**
+**OpenPGP signing research, protocol documentation, and reference tooling for Keycard Shell.**
 
-An application supplies structured intent. A separate trusted device validates
-that intent, derives the protocol-specific signing digest itself, presents what
-the human is authorizing, and gates a removable secure element's private-key
-operation behind physical approval and local PIN entry.
+> **Upstream milestone — October 14, 2026:** The Keycard Shell OpenPGP work
+> was merged into [`keycard-tech/keycard-shell` (PR #227)](https://github.com/keycard-tech/keycard-shell/pull/227).
+> Merging into the upstream repository is not the same as an official firmware
+> release; check Keycard Shell release notes before assuming a published build
+> contains these changes.
 
-The SAMA5D3 is the current reference device. NeoPGP on a programmable research
-JavaCard supplies the hardware key; it is a lab stand-in, not a proposal to
-replace the official Keycard applet on retail cards. Keycard Shell is the
-portable target, with the official Keycard applet a preferred secure-element
-target still under investigation.
+## Keycard Shell OpenPGP status
 
-The embedded OpenPGP artifact milestone is complete: the recorded hardware
-path produced a standard signature accepted by GnuPG and a clear-signed Thurin
-attestation verified by `identity-kit`. Integrating that path with the full
-trusted QR review loop remains work in progress.
+The upstream firmware implementation supports two operations on physical
+Keycard Shell hardware:
 
-> **Status snapshot — 2026-09-20.** Development moves quickly, and documentation
-> can become stale within a day. Status sections describe recorded evidence at
-> a checkpoint, not release guarantees. Compare dated prose with current code,
-> tests, and tracked artifacts; resolve conflicts using the implementation
-> evidence and update the docs at the next checkpoint. The
-> [roadmap](docs/ROADMAP_STATUS.md) provides detailed tracking, but can also lag.
-> A completed component milestone does not imply a completed end-to-end flow.
+- **`CREATE_IDENTITY`** — derives the OpenPGP identity using Shell-controlled
+  key-selection policy, presents the UID, creation time, and fingerprint for
+  on-device review, then generates a self-certified OpenPGP v4 public certificate
+  using a Keycard-backed secp256k1 key after approval.
+- **`SIGN_MESSAGE`** — validates and displays reviewable message text, requires
+  physical approval, canonicalizes text for OpenPGP signing, and returns an
+  OpenPGP v4 detached signature. The firmware's documented review limit is
+  **255 message bytes**; some experimental host tooling has a lower limit.
 
-**Experimental research only. Do not use this prototype for meaningful funds,
-production identities, or sensitive long-lived keys.**
+Requests and responses use the **`UR:BYTES` QR transport** via
+`Extras → OpenPGP` on Shell. Host applications construct requests and verify
+returned artifacts; private-key operations and authorization remain on Shell
+and the Keycard. The firmware implementation and hardware validation are
+recorded in [upstream PR #227](https://github.com/keycard-tech/keycard-shell/pull/227).
 
-## Architecture
+This repository holds supporting research and developer tools, including:
+
+- [The standalone Shell OpenPGP reference client](reference-client/) for QR
+  request generation and response decoding ([PR #43](https://github.com/0xterricola/keycard-openpgp/pull/43)).
+- [The version 1 protocol documentation](https://github.com/0xterricola/keycard-openpgp/pull/42),
+  covering CBOR requests, QR framing, firmware review rules, and response formats.
+- [Hardware-backed interoperability verification](https://github.com/0xterricola/keycard-openpgp/pull/41)
+  using GnuPG, RNP/Botan, and OpenPGP.js under documented compatibility constraints.
+- [ShellPGP for Thunderbird](https://github.com/0xterricola/shellpgp-thunderbird),
+  a separate experimental host integration that demonstrates hardware-backed
+  signed MIME messages. Native WebExtension camera acquisition remains blocked
+  in the tested Thunderbird builds
+  ([Mozilla bug #2080573](https://bugzilla.mozilla.org/show_bug.cgi?id=2080573));
+  external QR capture and manual response transfer have been demonstrated.
+
+**Security and release scope:** This is experimental research and integration
+software, not a security audit or a production assurance claim. The merged
+firmware functionality has been tested on physical hardware, but individual
+host integrations and future official releases have their own validation and
+compatibility requirements. Do not use experimental host tools for sensitive
+long-lived keys or meaningful funds without independently assessing the risks.
+
+## Historical reference-device research
+
+The material below documents earlier **SAMA5D3 + NeoPGP research**, including
+an experimental `KC1` QR envelope and a separate OpenPGP packet path. These
+are useful archived engineering experiments, **not** the current Keycard Shell
+`UR:BYTES` protocol or the merged firmware implementation.
+
+In that research setup, an application supplied structured intent to a trusted
+reference device. The SAMA5D3 used a display, keypad, camera, and programmable
+research JavaCard running NeoPGP; this did not replace the official Keycard
+applet. The recorded embedded artifact produced a GnuPG-accepted signature and
+an attestation verified by `identity-kit`. Integrating those separate SAMA5D3
+paths into one general QR-to-OpenPGP signing workflow was not completed; the
+upstream Keycard Shell work is an independent integration milestone.
+
+See also the historical [roadmap](docs/ROADMAP_STATUS.md). Dated findings below
+should be read as research checkpoints, not current Shell feature limitations.
+
+## SAMA5D3 reference architecture (historical)
 
 | Layer | Current implementation | Direction |
 | --- | --- | --- |
@@ -101,10 +140,14 @@ cannot choose signing bytes or metadata affecting the signed meaning unless
 the trusted adapter has independently validated them and included them in the
 protocol-defined digest.
 
-These are architectural requirements. The current prototype demonstrates
-parts of them; the rendering and integration limitations below remain open.
+These were requirements for the SAMA5D3 research setup. Its incomplete
+rendering and integration work must not be conflated with Keycard Shell.
 
-## Demonstrated status and remaining gaps
+## Demonstrated status and remaining gaps (historical research)
+
+The SAMA5D3 entries below are historical. The separate upstream Shell
+implementation is summarized at the top of this README.
+
 
 | Path | Recorded evidence | Scope |
 | --- | --- | --- |
@@ -112,20 +155,21 @@ parts of them; the rendering and integration limitations below remain open.
 | SAMA5D3 `KC1` QR loop | Camera input, trusted review of demonstrated messages, physical approval/rejection, local keypad PIN, raw signature response | Locally hashes the message with SHA-256; returns raw ECDSA |
 | Direct embedded OpenPGP path | Device constructs v4 digest and Signature Packet; NeoPGP signs; GnuPG reports `Good signature` | Fixed-message hardware test, separate from QR review |
 | Canonical Thurin OpenPGP artifact | Tracked clear-signed artifact returns `{ verified: true }` with `@thurinlabs/identity-kit` 1.1.1 | OpenPGP attestation verification, not Ethereum authorization |
-| Keycard Shell | Source research and a building experimental NeoPGP-detection branch | Custom firmware has not been run on retail Shell |
+| Keycard Shell | Physical hardware-tested `CREATE_IDENTITY` and `SIGN_MESSAGE` flows using Keycard-backed signing and QR | [Merged upstream in PR #227](https://github.com/keycard-tech/keycard-shell/pull/227); not an official firmware release |
 
-The interaction tests used the NeoPGP signature counter as hardware evidence:
+The historical SAMA5D3 interaction tests used the NeoPGP signature counter as hardware evidence:
 
 - Approved request and successful local PIN signing: `10 → 11`.
 - PIN-stage cancellation: `11 → 11`.
 - Request rejection: counter unchanged.
 
-The current signer uses local keypad PIN entry and masked display feedback;
+The historical SAMA5D3 signer used local keypad PIN entry and masked display feedback;
 the terminal PIN dependency has been removed. SSH and Ethernet still serve
 development and launch/debugging needs, so the board is not yet demonstrated
 as a fully network-disconnected device.
 
-Not yet demonstrated or completed:
+Not yet demonstrated or completed **in the SAMA5D3 research prototype**
+(not limitations of the merged Shell implementation):
 
 - A single structured OpenPGP QR request → trusted review → standard artifact
   response flow, including general text handling and complete rendering.
@@ -135,13 +179,13 @@ Not yet demonstrated or completed:
   followed by a hardware-authorized Sepolia attestation and registry lookup.
 - Generic request correlation, replay protection, persistent pending requests,
   retries, or BC-UR/multipart integration in this prototype.
-- Network-free boot/runtime, a working Shell port, or use of the official
-  Keycard applet as this project's signing SE.
+- Network-free SAMA5D3 boot/runtime or use of the official Keycard
+  applet within that research prototype.
 - Production backup/recovery or a production policy for cross-protocol keys.
 
-## KC1: current QR contract
+## KC1: historical SAMA5D3 QR contract
 
-The current request is:
+The historical KC1 request was:
 
 ```text
 KC1|OP=PGP_SIGN|MSG=KEYCARD OPENPGP TEST
@@ -185,7 +229,7 @@ Current source: [QR parser](embedded/sama5d3/qr_request.c),
 The [end-to-end QR report](docs/END_TO_END_QR_SIGNING.md) preserves the earlier
 test transcript; its terminal-PIN limitation predates the local keypad work.
 
-## OpenPGP artifact milestone
+## SAMA5D3 OpenPGP artifact milestone (historical)
 
 The connected GnuPG path and the direct embedded path both demonstrate
 OpenPGP signing, but use different software around the card.
@@ -224,18 +268,20 @@ identity, and creation time, and does not run the QR message-review workflow.
 The [v4 helper](embedded/sama5d3/openpgp_v4.c) is a digest/packet component,
 not a general cleartext canonicalizer or clear-signing formatter.
 
-The next OpenPGP integration is to combine those components with structured
-request validation, trusted review, approval, local PIN handling, and a
-standard result. Any canonicalization or signature metadata affecting the
-digest must be handled inside that trusted protocol adapter.
+This was the intended next integration for the SAMA5D3 experiment. The
+subsequent Keycard Shell firmware work implements its own structured
+OpenPGP request, trusted review, and standard artifact response flow.
+Any canonicalization or signature metadata affecting the digest still
+belongs inside the trusted protocol adapter.
 
 ## Keycard Shell and Ethereum/EVM research
 
-Shell is the intended portable interface because it provides smart-card
-transport, a display, physical controls, a camera, and QR support. The
-experimental NeoPGP AID-detection branch builds, but it is only a lab step.
-Retail Shell requires appropriately signed firmware; this project has not
-run its custom firmware on the retail device.
+Keycard Shell is now a physically tested OpenPGP target, with the
+identity-creation and message-signing implementation merged upstream in
+[PR #227](https://github.com/keycard-tech/keycard-shell/pull/227).
+The earlier NeoPGP AID-detection branch was a separate research step;
+it does not describe the merged Keycard-backed signing path. An official
+firmware release containing these changes has not been established here.
 
 The [Shell/EIP-712 research](docs/research/KEYCARD_SHELL_EIP712.md) records
 source observations from the `feature/openpgp-card` branch at `1ca841c`.
@@ -317,19 +363,20 @@ encoding and asynchronous middleware behavior have not been adopted here.
 
 ## Next checkpoints
 
-1. Close the KC1 parser/renderer mismatch and define complete trusted review
-   for the supported request types.
-2. Connect the proven OpenPGP digest/packet path to the trusted interaction
-   loop through a reusable structured request/result interface.
-3. Study/adopt suitable request correlation, replay rules, and QR/UR framing
-   without conflating transport with protocol semantics.
-4. Implement and test trusted EIP-712 processing, canonical Ethereum
-   signatures, and fixed-key identity handling; exercise Thurin's external
-   signer flow and then its Sepolia integration.
-5. Boot directly into the signer, remove SSH/Ethernet dependencies, and
-   demonstrate the network-free runtime.
-6. Port the validated interfaces and interaction model to suitable Shell
-   development hardware, subject to its firmware-signing constraints.
+1. Monitor upstream Keycard Shell releases and test the OpenPGP flow on a
+   published firmware build that includes the merged changes.
+2. Improve the standalone reference client's usability, QR capture, and
+   interoperability testing without weakening the Shell-controlled review
+   and signing boundary.
+3. Work with Mozilla on Thunderbird WebExtension camera acquisition
+   ([bug #2080573](https://bugzilla.mozilla.org/show_bug.cgi?id=2080573));
+   maintain external QR capture as an experimental workaround.
+4. Investigate trustworthy review and signing for larger messages, with
+   explicit display, canonicalization, memory, and multipart QR constraints.
+5. Continue independent Ethereum/EVM and Thurin authorization research;
+   do not treat working OpenPGP signing as proof of EVM wallet interoperability.
+6. Maintain the SAMA5D3 and `KC1` paths as historical research references,
+   clearly distinguished from the versioned Shell protocol.
 
 ## Reference hardware and verification
 
@@ -473,24 +520,29 @@ adds the protocol-specific digest and packet construction described above.
 
 ## Security and scope
 
-This project does not propose replacing `status-keycard` with NeoPGP, turning
-retail Keycard into a conventional OpenPGP smartcard, or requiring the same
-key for OpenPGP and Ethereum. It does not claim a retail Shell port, complete
-wallet interoperability, or a production security boundary.
+The merged Keycard Shell work does not replace the official Keycard applet
+with NeoPGP, turn retail Keycard into a conventional OpenPGP smartcard, or
+require sharing one key between OpenPGP and Ethereum. The historical SAMA5D3
+experiments are separate from the upstream Keycard Shell implementation.
 
-Using one private key across OpenPGP and Ethereum collapses security domains.
-A production design needs protocol separation, trusted display, explicit
-physical authorization, and a considered recovery model.
+Hardware testing and upstream merge do not constitute a security audit or
+prove that any host integration is production-ready. There is no claim here
+of complete wallet interoperability, release availability, production backup
+and recovery, or a universally air-gapped runtime. Protocol separation,
+trusted display, explicit physical authorization, and a considered recovery
+model remain important requirements.
 
 Do not commit private keys, PINs, local GnuPG state, firmware signing keys, or
 sensitive development credentials to this repository.
 
 ## Documentation and license
 
-- [Roadmap & Project Status](docs/ROADMAP_STATUS.md) — detailed milestone tracking.
-- [End-to-End QR Signing Prototype](docs/END_TO_END_QR_SIGNING.md) — historical
-  optical signing demonstration and counter evidence.
-- [Keycard Shell EIP-712 Research](docs/research/KEYCARD_SHELL_EIP712.md) —
-  inspected source behavior, candidate reuse, and unresolved questions.
+- [Upstream Keycard Shell OpenPGP implementation (PR #227)](https://github.com/keycard-tech/keycard-shell/pull/227) — merged firmware changes and hardware validation.
+- [Shell OpenPGP protocol v1 (PR #42)](https://github.com/0xterricola/keycard-openpgp/pull/42) — versioned requests and results.
+- [Standalone reference client](reference-client/) — experimental QR request/response tooling.
+- [ShellPGP for Thunderbird](https://github.com/0xterricola/shellpgp-thunderbird) — separate signed-email experiment.
+- [Roadmap & Project Status](docs/ROADMAP_STATUS.md) — historical milestone tracking; may lag current work.
+- [End-to-End QR Signing Prototype](docs/END_TO_END_QR_SIGNING.md) — historical SAMA5D3 demonstration.
+- [Keycard Shell EIP-712 Research](docs/research/KEYCARD_SHELL_EIP712.md) — earlier Ethereum source research and open questions.
 
 Licensed under [MIT](LICENSE).

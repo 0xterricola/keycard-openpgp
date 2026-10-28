@@ -36,7 +36,8 @@ This repository holds supporting research and developer tools, including:
   covering CBOR requests, QR framing, firmware review rules, and response formats.
 - [Hardware-backed interoperability verification](https://github.com/0xterricola/keycard-openpgp/pull/41)
   using GnuPG, RNP/Botan, and OpenPGP.js under documented compatibility constraints.
-- [ShellPGP for Thunderbird](https://github.com/0xterricola/shellpgp-thunderbird),
+- [GapPGP integration overview](docs/GAPPGP.md) — architecture, security model, and interoperability.
+- [GapPGP for Thunderbird](https://github.com/0xterricola/gappgp-thunderbird),
   a separate experimental host integration that demonstrates hardware-backed
   signed MIME messages. Native WebExtension camera acquisition remains blocked
   in the tested Thunderbird builds
@@ -540,7 +541,7 @@ sensitive development credentials to this repository.
 - [Upstream Keycard Shell OpenPGP implementation (PR #227)](https://github.com/keycard-tech/keycard-shell/pull/227) — merged firmware changes and hardware validation.
 - [Shell OpenPGP protocol v1 (PR #42)](https://github.com/0xterricola/keycard-openpgp/pull/42) — versioned requests and results.
 - [Standalone reference client](reference-client/) — experimental QR request/response tooling.
-- [ShellPGP for Thunderbird](https://github.com/0xterricola/shellpgp-thunderbird) — separate signed-email experiment.
+- [GapPGP for Thunderbird](https://github.com/0xterricola/gappgp-thunderbird) — separate signed-email experiment.
 - [Roadmap & Project Status](docs/ROADMAP_STATUS.md) — historical milestone tracking; may lag current work.
 - [End-to-End QR Signing Prototype](docs/END_TO_END_QR_SIGNING.md) — historical SAMA5D3 demonstration.
 - [Keycard Shell EIP-712 Research](docs/research/KEYCARD_SHELL_EIP712.md) — earlier Ethereum source research and open questions.
